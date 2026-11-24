@@ -2,6 +2,7 @@
   let client = null;
   let config = null;
   let initialising = null;
+  let redirectAccessToken = "";
 
   class ReconnectRequiredError extends Error {
     constructor(message) {
@@ -30,6 +31,7 @@
       });
       await client.initialize();
       const redirectResult = await client.handleRedirectPromise();
+      redirectAccessToken = redirectResult?.accessToken || "";
       const account = redirectResult?.account ?? client.getAllAccounts()[0] ?? null;
       if (account) client.setActiveAccount(account);
       return account;
@@ -65,6 +67,11 @@
     await initialise();
     const current = account();
     if (!current) return null;
+    if (redirectAccessToken) {
+      const token = redirectAccessToken;
+      redirectAccessToken = "";
+      return token;
+    }
     try {
       return (await client.acquireTokenSilent({ account: current, scopes: [config.apiScope] })).accessToken;
     } catch (reason) {

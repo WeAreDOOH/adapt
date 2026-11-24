@@ -140,10 +140,13 @@ function errorMessage(reason) {
 
 async function serve(response, method, file, contentType) {
   const data = await readFile(path.join(staticRoot, file));
+  const mutableAuthenticationAsset = ["auth.js", "msal-client.js", "account.js", "users.js"].includes(file);
   response.writeHead(200, {
     "Content-Type": contentType,
     "Content-Length": data.length,
-    "Cache-Control": file.endsWith(".html") ? "no-store" : "private, max-age=3600",
+    "Cache-Control": file.endsWith(".html") || mutableAuthenticationAsset
+      ? "no-store"
+      : "private, max-age=3600, immutable",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "X-Frame-Options": "DENY",
