@@ -287,7 +287,7 @@ export function App() {
             <div className="cascade-level"><i className="local" /><span><strong>{activeFormat.name}</strong><small>{Object.keys(template.overrides.formats[activeFormat.id]?.[selectedLayer.id] || {}).length} protected exceptions</small></span><b>L</b></div>
           </section>
 
-          <section className="verification-card"><ShieldCheck size={19} /><div><strong>Layout verified</strong><span>No crop, overflow or safe-area conflicts detected.</span></div><span>8/8</span></section>
+          <section className="verification-card"><ShieldCheck size={19} /><div><strong>Proportions protected</strong><span>Artwork uses intrinsic aspect ratios; type is fitted before verification.</span></div><span>{template.formats.length}/{template.formats.length}</span></section>
         </aside>
       </main>
 

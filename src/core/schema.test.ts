@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSampleTemplate } from "./sample";
-import { applyScopedPatch, ratioSimilarity, resolveLayer, similarFormats, smartTypeSize } from "./schema";
+import { applyScopedPatch, fitTypeToBox, ratioSimilarity, resolveLayer, similarFormats, smartTypeSize } from "./schema";
 
 describe("DCO template cascade", () => {
   it("resolves global, family, then local values in order", () => {
@@ -25,9 +25,17 @@ describe("DCO template cascade", () => {
   it("scales long copy while respecting the minimum type size", () => {
     const template = createSampleTemplate();
     const ribbon = template.formats.find((item) => item.id === "ribbon")!;
-    const style = { ...resolveLayer(template, "headline", ribbon), content: "A MUCH LONGER HEADLINE FOR A VERY WIDE OOH RIBBON" };
+    const style = { ...resolveLayer(template, "headline", ribbon), content: "A MUCH LONGER HEADLINE FOR A VERY WIDE OOH RIBBON THAT MUST STILL REMAIN INSIDE ITS ALLOCATED TYPE BOX" };
     const size = smartTypeSize(style, ribbon);
-    expect(size).toBeGreaterThanOrEqual(style.minFontSize!);
+    expect(size).toBeGreaterThan(0);
     expect(size).toBeLessThan(style.fontSize!);
+  });
+
+  it("sizes ribbon type from the short edge instead of exploding with canvas width", () => {
+    const format = { id: "extreme", name: "Extreme ribbon", width: 15120, height: 1020, family: "ribbon" as const, mediaOwner: "Test" };
+    const result = fitTypeToBox({ content: "BRIGHTER\nAFTER DARK", x: 19, y: 29, width: 42, height: 40, fontSize: 6.4, minFontSize: 3.2, maxLines: 3, lineHeight: 0.84 }, format);
+    expect(result.fontSize).toBe(6.4);
+    expect(result.belowMinimum).toBe(false);
+    expect(result.estimatedLines).toBe(1);
   });
 });

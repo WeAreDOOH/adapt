@@ -16,7 +16,7 @@ export function inferRole(name: string): { role: LayerRole; confidence: number }
   return match ? { role: match[0], confidence: 0.94 } : { role: "hero", confidence: 0.52 };
 }
 
-export function semanticLayerFromSource(input: { id: string; name: string; kind?: LayerKind; text?: string; x?: number; y?: number; width?: number; height?: number }): SemanticLayer {
+export function semanticLayerFromSource(input: { id: string; name: string; kind?: LayerKind; text?: string; x?: number; y?: number; width?: number; height?: number; intrinsicAspectRatio?: number }): SemanticLayer {
   const inferred = inferRole(input.name);
   return {
     id: input.id,
@@ -37,6 +37,7 @@ export function semanticLayerFromSource(input: { id: string; name: string; kind?
       minFontSize: inferred.role === "headline" ? 3 : 0.8,
       maxLines: inferred.role === "headline" ? 3 : 4,
       lineHeight: inferred.role === "headline" ? 0.9 : 1.25,
+      intrinsicAspectRatio: input.intrinsicAspectRatio,
     },
   };
 }

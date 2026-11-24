@@ -33,6 +33,7 @@ export interface LayerStyle {
   bleed?: number;
   color?: string;
   opacity?: number;
+  intrinsicAspectRatio?: number;
 }
 
 export interface SemanticLayer {
@@ -94,14 +95,42 @@ export function similarFormats(template: DcoTemplate, format: FormatDefinition):
   return template.formats.filter((candidate) => ratioSimilarity(format, candidate) >= 1 - template.rules.similarityTolerance);
 }
 
-export function smartTypeSize(style: LayerStyle, format: FormatDefinition): number {
+export interface TypeFitResult {
+  fontSize: number;
+  requestedSize: number;
+  minimumSize: number;
+  belowMinimum: boolean;
+  estimatedLines: number;
+}
+
+function characterWidth(text: string) {
+  return [...text].reduce((total, character) => total + (character === " " ? 0.3 : /[MW@#★]/.test(character) ? 0.82 : /[I1|]/.test(character) ? 0.34 : 0.56), 0);
+}
+
+export function fitTypeToBox(style: LayerStyle, format: FormatDefinition): TypeFitResult {
   const copy = (style.content || "").trim();
-  const words = Math.max(1, copy.split(/\s+/).length);
   const aspect = format.width / format.height;
-  const shapeFactor = aspect > 2.4 ? 0.72 : aspect < 0.7 ? 0.9 : 1;
-  const copyFactor = Math.max(0.62, Math.min(1, 7 / words));
-  const requested = (style.fontSize || 6) * shapeFactor * copyFactor;
-  return Math.max(style.minFontSize || 2.6, requested);
+  const collapseToOneLine = format.family === "ribbon";
+  const lines = collapseToOneLine ? [copy.replace(/\s+/g, " ")] : (copy.split(/\n/).filter(Boolean).length ? copy.split(/\n/).filter(Boolean) : [copy]);
+  const longestLine = Math.max(1, ...lines.map(characterWidth));
+  // Type is expressed in cqmin: a percentage of the shorter canvas edge. This
+  // remains stable for towers and ribbons, unlike width-only cqw sizing.
+  const boxWidth = aspect >= 1 ? style.width * aspect : style.width;
+  const boxHeight = aspect >= 1 ? style.height : style.height / Math.max(aspect, 0.0001);
+  const widthLimit = boxWidth / longestLine;
+  const heightLimit = boxHeight / (Math.max(1, lines.length) * Math.max(0.72, style.lineHeight || 1) * 1.08);
+  const requestedSize = style.fontSize || 6;
+  const fontSize = Math.max(0.25, Math.min(requestedSize, widthLimit, heightLimit));
+  const minimumSize = style.minFontSize || Math.min(1, requestedSize);
+  return { fontSize, requestedSize, minimumSize, belowMinimum: fontSize + 0.001 < minimumSize, estimatedLines: lines.length };
+}
+
+export function smartTypeSize(style: LayerStyle, format: FormatDefinition): number {
+  return fitTypeToBox(style, format).fontSize;
+}
+
+export function layerWithinCanvas(style: LayerStyle): boolean {
+  return style.x >= 0 && style.y >= 0 && style.width >= 0 && style.height >= 0 && style.x + style.width <= 100 && style.y + style.height <= 100;
 }
 
 export function applyScopedPatch(

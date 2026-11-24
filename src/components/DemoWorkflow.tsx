@@ -60,7 +60,7 @@ function enrichStyles(layers: SemanticLayer[]) {
   const sampleByRole = new Map(createSampleTemplate().layers.map((layer) => [layer.role, layer.style]));
   return layers.map((layer) => {
     const sample = sampleByRole.get(layer.role);
-    return sample ? { ...layer, style: { ...sample, content: layer.style.content ?? sample.content } } : layer;
+    return sample ? { ...layer, style: { ...sample, content: layer.style.content ?? sample.content, intrinsicAspectRatio: layer.style.intrinsicAspectRatio ?? sample.intrinsicAspectRatio } } : layer;
   });
 }
 

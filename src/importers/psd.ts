@@ -40,6 +40,7 @@ export const psdAdapter: ImportAdapter = {
       y: ((layer.top || 0) / height) * 100,
       width: (((layer.right || width) - (layer.left || 0)) / width) * 100,
       height: (((layer.bottom || height) - (layer.top || 0)) / height) * 100,
+      intrinsicAspectRatio: Math.max(0.0001, ((layer.right || width) - (layer.left || 0)) / Math.max(1, (layer.bottom || height) - (layer.top || 0))),
     }));
     return {
       adapterId: "psd",
