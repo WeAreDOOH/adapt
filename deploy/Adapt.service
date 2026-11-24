@@ -1,0 +1,31 @@
+[Unit]
+Description=Adapt creative format planner
+After=network-online.target ai-pub-sign.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/adapt/current
+Environment=NODE_ENV=production
+Environment=PORT=3103
+Environment=ADAPT_STATIC_ROOT=/var/www/adapt/current/dist
+EnvironmentFile=/var/www/adapt/shared/auth.env
+ExecStart=/usr/bin/node --max-old-space-size=64 server.mjs
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=128M
+
+[Install]
+WantedBy=multi-user.target

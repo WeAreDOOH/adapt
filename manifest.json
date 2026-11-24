@@ -62,13 +62,13 @@
     },
     {
       "path": "package.json",
-      "bytes": 469,
-      "sha256": "6bc8a52147b26e40ac45e8e90ba8d5290636afb3e7fc39793154403bf91dfe3e"
+      "bytes": 562,
+      "sha256": "1935c36dd36295a2336b1d4ef85d2a464301962281c26d6a9758734e15f49b07"
     },
     {
       "path": "src/aspect-ratios.html",
-      "bytes": 181477,
-      "sha256": "cf50c075faaf1dc8047210ce95f510d27ca092cb09c0d58a9d8a77130100616a"
+      "bytes": 182510,
+      "sha256": "9b790d3af39451170d8b81ae471ca0c2a3a3de139104f39f8d7ef53cfa7b7a89"
     },
     {
       "path": "tests/requirements.txt",

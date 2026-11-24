@@ -159,6 +159,12 @@ body{font-weight:400}
 .brand svg{display:block}
 .brand .dot{color:var(--accent)}
 .appbar .sub{margin:0 0 0 6px;color:var(--muted);font-size:.875rem;font-weight:300}
+.adapt-account{margin-left:auto;position:relative}
+.adapt-account summary{list-style:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:.75rem;font-weight:700;cursor:pointer}
+.adapt-account summary::-webkit-details-marker{display:none}
+.adapt-account-card{position:absolute;right:0;top:42px;min-width:230px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-6);display:grid;gap:3px}
+.adapt-account-card strong{font-size:.9rem}.adapt-account-card span{font-size:.78rem;color:var(--muted)}
+.adapt-account-card button{margin-top:8px;width:100%}
 .wrap{max-width:1440px;padding:28px 20px 48px}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:16px 0 28px}
 @media (max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -625,6 +631,10 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
 <div class="appbar">
   <div class="brand"><svg width="30" height="24" viewBox="0 0 30 24" aria-hidden="true"><rect x="1" y="1" width="28" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="6" y="5" width="18" height="14" rx="1.5" fill="none" stroke="var(--accent)" stroke-width="2"/><rect x="11" y="9" width="8" height="6" rx="1" fill="var(--accent)"/></svg><span>Adapt<span class="dot">.</span></span></div>
   <p class="sub">Group sizes by aspect ratio and plan the artwork to make</p>
+  <details class="adapt-account" id="adaptAccount" hidden>
+    <summary id="adaptAccountInitials" aria-label="Account"></summary>
+    <div class="adapt-account-card"><strong id="adaptAccountName"></strong><span id="adaptAccountEmail"></span><button type="button" id="adaptSignOut">Sign out</button></div>
+  </details>
 </div>
 <div class="wrap">
   <div class="stats" role="tablist" aria-label="Views">
@@ -2088,5 +2098,6 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   render();
 })();
 </script>
+<script src="/account.js" defer></script>
 </body>
 </html>

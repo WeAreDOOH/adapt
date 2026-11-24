@@ -5,11 +5,15 @@
   "description": "Adapt. — plans the smallest verified set of artwork files for a list of screen sizes. The app is src/aspect-ratios.html; these packages are only needed by the tests.",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "start": "node server.mjs",
     "test": "python3 tests/smoke_test.py"
   },
   "devDependencies": {
     "ag-psd": "31.0.2",
     "jszip": "3.10.1",
     "xlsx": "0.18.5"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "5.29.0"
   }
 }
