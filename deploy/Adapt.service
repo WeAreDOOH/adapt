@@ -1,6 +1,6 @@
 [Unit]
 Description=Adapt creative format planner
-After=network-online.target ai-pub-sign.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]
