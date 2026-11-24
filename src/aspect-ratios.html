@@ -164,7 +164,8 @@ body{font-weight:400}
 .adapt-account summary::-webkit-details-marker{display:none}
 .adapt-account-card{position:absolute;right:0;top:42px;min-width:230px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-6);display:grid;gap:3px}
 .adapt-account-card strong{font-size:.9rem}.adapt-account-card span{font-size:.78rem;color:var(--muted)}
-.adapt-account-card button{margin-top:8px;width:100%}
+.adapt-account-card button,.adapt-account-card a{margin-top:8px;width:100%}
+.adapt-account-card a{display:block;text-align:center;padding:8px;border:1px solid var(--line);border-radius:4px;color:var(--ink);text-decoration:none;font-size:.8rem}
 .wrap{max-width:1440px;padding:28px 20px 48px}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:16px 0 28px}
 @media (max-width:900px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -633,7 +634,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   <p class="sub">Group sizes by aspect ratio and plan the artwork to make</p>
   <details class="adapt-account" id="adaptAccount" hidden>
     <summary id="adaptAccountInitials" aria-label="Account"></summary>
-    <div class="adapt-account-card"><strong id="adaptAccountName"></strong><span id="adaptAccountEmail"></span><button type="button" id="adaptSignOut">Sign out</button></div>
+    <div class="adapt-account-card"><strong id="adaptAccountName"></strong><span id="adaptAccountEmail"></span><a id="adaptManageUsers" href="/admin/users" hidden>Manage users</a><button type="button" id="adaptReconnect">Reconnect Microsoft</button><button type="button" id="adaptSignOut">Sign out</button></div>
   </details>
 </div>
 <div class="wrap">
@@ -2098,6 +2099,8 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   render();
 })();
 </script>
+<script src="/msal-browser.min.js"></script>
+<script src="/msal-client.js"></script>
 <script src="/account.js" defer></script>
 </body>
 </html>

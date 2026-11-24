@@ -11,6 +11,7 @@ WorkingDirectory=/var/www/adapt/current
 Environment=NODE_ENV=production
 Environment=PORT=3103
 Environment=ADAPT_STATIC_ROOT=/var/www/adapt/current/dist
+Environment=ADAPT_DB_PATH=/var/www/adapt/shared/adapt.sqlite
 EnvironmentFile=/var/www/adapt/shared/auth.env
 ExecStart=/usr/bin/node --max-old-space-size=64 server.mjs
 Restart=always
@@ -25,6 +26,7 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/www/adapt/shared
 MemoryMax=128M
 
 [Install]

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Users — Adapt.</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;background:#0f1012;color:#f5f7f8}*{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at 80% 10%,rgba(153,86,190,.16),transparent 28%),#0f1012}
+    header{height:64px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #292c30;background:#17181b}header a{color:#f5f7f8;text-decoration:none;font-weight:750}.dot{color:#4aa6d5}header span{color:#889096;font-size:.8rem}
+    main{width:min(980px,calc(100% - 32px));margin:48px auto}.eyebrow{color:#8cc7e7;text-transform:uppercase;letter-spacing:.13em;font-weight:700;font-size:.7rem}h1{font-size:3rem;line-height:1;margin:.5rem 0 1rem}p{color:#aeb3b8;line-height:1.55}
+    .panel{margin-top:32px;background:#1e1f22;border:1px solid #303338;border-radius:14px;overflow:hidden}.add{padding:26px;border-bottom:1px solid #303338}.add form{display:flex;gap:10px;margin-top:18px}.add input{flex:1;min-width:0;padding:12px 14px;border:1px solid #41454b;border-radius:8px;background:#131416;color:#fff;font:inherit}.add button,.row button{border:0;border-radius:8px;padding:11px 16px;background:#4aa6d5;color:#071117;font:inherit;font-weight:750;cursor:pointer}.add button:disabled,.row button:disabled{opacity:.55;cursor:wait}
+    .notice,.error{margin:12px 0 0;font-size:.85rem}.notice{color:#83d9a0}.error{color:#ffad91}.list-head,.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:18px 26px}.list-head{color:#889096;text-transform:uppercase;letter-spacing:.1em;font-size:.7rem;font-weight:700}.row{border-top:1px solid #303338}.row strong{display:block;font-size:.94rem}.row span{display:block;margin-top:4px;color:#889096;font-size:.78rem}.row button{background:transparent;color:#ffb6a1;border:1px solid #5a3932;padding:7px 11px}.row em{font-style:normal;color:#8cc7e7;font-size:.78rem}.back{display:inline-block;margin-top:24px;color:#8cc7e7;text-decoration:none}
+    @media(max-width:600px){header{padding:0 16px}main{margin-top:32px}.add form{display:grid}.list-head,.row,.add{padding-left:18px;padding-right:18px}h1{font-size:2.4rem}}
+  </style>
+</head>
+<body>
+  <header><a href="/">Adapt<span class="dot">.</span></a><span>Administration</span></header>
+  <main>
+    <p class="eyebrow">Microsoft access</p>
+    <h1>Users<span class="dot">.</span></h1>
+    <p>Add the email address of a Microsoft account. Microsoft verifies the identity; this list decides who may use Adapt.</p>
+    <section class="panel">
+      <div class="add">
+        <strong>Add access</strong>
+        <form id="addUser"><input id="email" name="email" type="email" placeholder="name@dooh.com" autocomplete="off" required><button type="submit">Add user</button></form>
+        <p class="notice" id="notice" hidden></p><p class="error" id="error" role="alert" hidden></p>
+      </div>
+      <div class="list-head"><span>Authorised users</span><span id="count">—</span></div>
+      <div id="users"></div>
+    </section>
+    <a class="back" href="/">← Return to Adapt</a>
+  </main>
+  <script src="/msal-browser.min.js"></script>
+  <script src="/msal-client.js"></script>
+  <script src="/users.js"></script>
+</body>
+</html>
