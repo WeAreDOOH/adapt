@@ -1,0 +1,2 @@
+playwright>=1.40
+psd-tools>=1.9

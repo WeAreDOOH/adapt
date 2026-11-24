@@ -1,0 +1,84 @@
+{
+  "name": "Adapt. aspect ratio planner",
+  "packaged": "2026-11-24",
+  "entry": "src/aspect-ratios.html",
+  "live_page": "https://adapt.dooh.com",
+  "handoff_doc": "https://claude.ai/code/artifact/ecac57da-8846-4cfc-b13a-f0fedc8647ab",
+  "runtime_libraries": {
+    "xlsx": "0.18.5 (cdnjs)",
+    "jszip": "3.10.1 (cdnjs)",
+    "ag-psd": "31.0.2 (jsDelivr)"
+  },
+  "tests": {
+    "command": "python3 tests/smoke_test.py",
+    "checks": 31,
+    "status": "all passing"
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 2215,
+      "sha256": "b7bf414e48dd2356a607d6e56b4742a7e3b3693bff6c93ca0989630a3668a80e"
+    },
+    {
+      "path": "HANDOFF.md",
+      "bytes": 9472,
+      "sha256": "749a4d43b6e3cd2318dbf785db9ac9b5f9993dccc81693b671cf54e83af9e32c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1512,
+      "sha256": "37a5d2920994c6fa84ceb3e96e058b738ab2f082902b916bde332ed49d7bde99"
+    },
+    {
+      "path": "experimental/aepx/gen.py",
+      "bytes": 9961,
+      "sha256": "64dd3beb9bbc17e9e7f2042574540d1a99e85dc017ecce67d46e50cb0fc25571"
+    },
+    {
+      "path": "experimental/aepx/plan.example.json",
+      "bytes": 426,
+      "sha256": "a46f53498c45cb1c7d633490a0ce708fd1e09fc2a909a5d12064bcd25f2e5019"
+    },
+    {
+      "path": "experimental/aepx/probes/probe_1_clone.aepx",
+      "bytes": 2481406,
+      "sha256": "7bd847b4501b14606c7cffa0bc306e3f028c24440b4a565ce5a196c8f869e7a4"
+    },
+    {
+      "path": "experimental/aepx/probes/probe_2_keep_text.aepx",
+      "bytes": 946204,
+      "sha256": "3f69868bfeaf9ea0c405d166341d6dc5ede76cd48ae346e1e07447f4991d73e4"
+    },
+    {
+      "path": "experimental/aepx/probes/probe_3_no_text.aepx",
+      "bytes": 860994,
+      "sha256": "9278021c0ebf8f7cd1e01e4e3d2a22d35174b701ed70476f209556acc609b991"
+    },
+    {
+      "path": "experimental/aepx/template.aepx",
+      "bytes": 2303902,
+      "sha256": "f95f3f90a065fa42927d30d63ba85438571382fa5ab93d7be49d600a893bf804"
+    },
+    {
+      "path": "package.json",
+      "bytes": 469,
+      "sha256": "6bc8a52147b26e40ac45e8e90ba8d5290636afb3e7fc39793154403bf91dfe3e"
+    },
+    {
+      "path": "src/aspect-ratios.html",
+      "bytes": 181477,
+      "sha256": "cf50c075faaf1dc8047210ce95f510d27ca092cb09c0d58a9d8a77130100616a"
+    },
+    {
+      "path": "tests/requirements.txt",
+      "bytes": 32,
+      "sha256": "591cdefe52937d9e7756eb822b9c695e12bad619bab386be03e116acf51039be"
+    },
+    {
+      "path": "tests/smoke_test.py",
+      "bytes": 7705,
+      "sha256": "d0f2077b3440a7ad4e59a415b54be388bb81571c6b9244ddcaf672144c50d53a"
+    }
+  ]
+}

@@ -1,33 +1,15 @@
 {
-  "name": "adapt",
-  "version": "0.1.0",
+  "name": "adapt-aspect-ratio-planner",
+  "version": "1.0.0",
   "private": true,
-  "type": "module",
+  "description": "Adapt. — plans the smallest verified set of artwork files for a list of screen sizes. The app is src/aspect-ratios.html; these packages are only needed by the tests.",
   "scripts": {
-    "dev": "node server.mjs",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview --host 127.0.0.1",
-    "test": "vitest run",
-    "check": "npm run test && npm run build"
-  },
-  "dependencies": {
-    "ag-psd": "^31.0.2",
-    "dotenv": "^16.6.1",
-    "express": "^5.1.0",
-    "jszip": "^3.10.1",
-    "lucide-react": "^0.468.0",
-    "openai": "^6.15.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "xlsx": "^0.18.5",
-    "zod": "^4.1.13"
+    "build": "node scripts/build.mjs",
+    "test": "python3 tests/smoke_test.py"
   },
   "devDependencies": {
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^5.1.1",
-    "typescript": "^5.9.3",
-    "vite": "^7.2.4",
-    "vitest": "^4.0.14"
+    "ag-psd": "31.0.2",
+    "jszip": "3.10.1",
+    "xlsx": "0.18.5"
   }
 }
