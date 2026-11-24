@@ -51,3 +51,21 @@ test("owner manages the app email list without changing Entra", () => {
   database.close();
   rmSync(directory, { recursive: true, force: true });
 });
+
+test("saved plans use unguessable view ids and a separate edit key", () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "adapt-db-"));
+  const filename = path.join(directory, "adapt.sqlite");
+  const database = openAdaptDatabase(filename);
+  const plan = { v: 1, sizes: "1920x1080\n1080x1920", art: "", o: { allowDown: 1 } };
+  const created = database.createPlan("Launch campaign", plan);
+  assert.match(created.id, /^[A-Za-z0-9_-]{16}$/);
+  assert.ok(created.editKey.length >= 20);
+  assert.equal(database.getPlan(created.id).name, "Launch campaign");
+  assert.throws(() => database.updatePlan(created.id, "not-the-key", "Changed", plan), /edit key|updated/);
+  const updated = database.updatePlan(created.id, created.editKey, "Launch campaign v2", { ...plan, sizes: "3840x2160" });
+  assert.equal(updated.name, "Launch campaign v2");
+  assert.equal(updated.plan.sizes, "3840x2160");
+  assert.equal(Object.hasOwn(updated, "editKey"), false);
+  database.close();
+  rmSync(directory, { recursive: true, force: true });
+});

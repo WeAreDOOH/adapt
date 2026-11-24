@@ -423,6 +423,21 @@ button.linkish:hover{text-decoration:underline;background:none}
 .openrow{display:flex;gap:8px}
 .openrow input{flex:1 1 auto;min-width:0;height:30px;padding:0 10px;border-radius:4px;border:1px solid rgba(127,127,127,.5);background:transparent;color:var(--ink);font:inherit;font-size:.8125rem}
 .openrow input:focus-visible{outline:0;border-color:var(--accent)}
+.aiimport{margin-top:16px;padding:14px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;background:var(--raised)}
+.aiimport h3{margin:0 0 5px;font-size:.95rem;font-weight:500;display:flex;align-items:center;gap:7px}.aiimport h3 svg{color:var(--accent);flex:0 0 auto}.aiimport .help{margin-bottom:10px}
+.docpick{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.docpick .filename{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.aistatus{margin:8px 0 0;font-size:.78rem;color:var(--muted)}.aistatus.busy{color:var(--accent)}.aistatus.err{color:var(--warn)}
+.reviewdlg{width:min(1120px,calc(100vw - 32px));max-width:1120px;max-height:calc(100vh - 32px);padding:0;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);box-shadow:var(--shadow-6)}
+.reviewdlg::backdrop{background:rgba(0,0,0,.68)}.reviewhead{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:16px;align-items:start;padding:18px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.reviewhead h2{margin:0;font-size:1.2rem}.reviewhead p{margin:3px 0 0;color:var(--muted);font-size:.82rem}.reviewbody{padding:20px}.reviewsummary{font-size:.95rem;margin:0 0 16px}
+.convention{padding:12px;border-radius:4px;background:var(--accent-soft);margin-bottom:16px;font-size:.85rem}.convention b{font-weight:500}
+.reviewtable{width:100%;border-collapse:collapse;margin:0 0 18px}.reviewtable th,.reviewtable td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:9px 8px;font-size:.78rem}.reviewtable th{color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.7px}.reviewtable code{white-space:nowrap;color:var(--ink)}
+.reviewtable .source{min-width:170px}.reviewtable .explain{min-width:240px}.reviewtable tr.attn{background:rgba(230,81,0,.06)}.reviewtable tr.physical{background:rgba(153,86,190,.08)}
+.reviewtag{display:inline-block;padding:1px 7px;border-radius:999px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;border:1px solid var(--line)}.reviewtag.ready{color:var(--ok);border-color:var(--ok)}.reviewtag.review{color:var(--warn);border-color:var(--warn)}.reviewtag.physical_review{color:var(--group);border-color:var(--group)}
+.auditgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:760px){.auditgrid{grid-template-columns:1fr}.reviewtable{display:block;overflow:auto}}
+.auditbox{border:1px solid var(--line);border-radius:4px;padding:12px}.auditbox h3{margin:0 0 8px;font-size:.9rem}.auditbox ul{margin:0;padding-left:20px}.auditbox li{margin:5px 0;font-size:.82rem}.auditbox li.critical,.auditbox li.warning{color:var(--warn)}
+.reviewfoot{position:sticky;bottom:0;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 20px;background:var(--panel);border-top:1px solid var(--line)}
+.savedlist{display:grid;gap:6px;margin-top:10px}.saveditem{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:5px;align-items:center}.saveditem button{height:26px;padding:0 8px;font-size:.68rem}.saveditem .savedname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem}
 .filecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;align-items:stretch}
 .fcard{background:var(--raised);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .fcard.have{border-left-color:var(--muted)}
@@ -663,6 +678,13 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
       <p class="restored" id="sharedNote" hidden>Opened a shared plan. Edits here stay on your copy.</p>
       <p class="restored" id="restored" hidden>Showing the list you entered last time. <button type="button" class="linkbtn" id="useExample">Load the example instead</button></p>
 
+      <div class="aiimport" id="aiImport">
+        <h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l1.25 3.75L17 8l-3.75 1.25L12 13l-1.25-3.75L7 8l3.75-1.25L12 3zM18.5 13l.75 2.25L21.5 16l-2.25.75L18.5 19l-.75-2.25L15.5 16l2.25-.75L18.5 13zM5.5 12l.75 2.25L8.5 15l-2.25.75L5.5 18l-.75-2.25L2.5 15l2.25-.75L5.5 12z"/></svg><span>Review Document</span></h3>
+        <p class="help">Upload a spreadsheet, PDF, Word document or presentation. Adapt will explain every likely dimension and flag assumptions before anything enters this plan.</p>
+        <div class="docpick"><label class="mini-drop"><u>Choose document</u><input type="file" id="docInput" class="sr" accept=".pdf,.csv,.tsv,.xls,.xlsx,.doc,.docx,.rtf,.odt,.txt,.md,.ppt,.pptx"></label><span class="filename" id="docName">No file chosen</span><button type="button" class="primary" id="docReview" disabled>Review</button></div>
+        <p class="aistatus" id="docStatus">Nothing is imported until you approve the review.</p>
+      </div>
+
       <div class="options">
         <div class="opthead"><span class="label-big">Scaling rules</span>
           <span class="riskkey" aria-label="Risk to the artwork"><i class="k-low"></i>Safe <i class="k-mid"></i>Changes fit <i class="k-high"></i>Removes artwork</span></div>
@@ -695,6 +717,13 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
           <summary>Open a shared plan</summary>
           <p class="help">Paste a plan link someone sent you.</p>
           <div class="openrow"><input type="text" id="planIn" placeholder="https://…#plan=…" aria-label="Plan link"><button type="button" id="planOpen">Open</button></div>
+        </details>
+        <details class="artbox" id="saveBox">
+          <summary>Save and reuse plans</summary>
+          <p class="help">Name this plan to keep a reusable project link. Anyone with the link can view a copy; only this browser receives its edit key.</p>
+          <div class="openrow"><input type="text" id="planName" maxlength="120" placeholder="Campaign or project name" aria-label="Plan name"><button type="button" id="savePlan">Save</button></div>
+          <div class="row"><button type="button" id="shareSaved" hidden>Copy saved link</button><span class="hint" id="savedStatus"></span></div>
+          <div class="savedlist" id="savedList"></div>
         </details>
       </div>
       </div>
@@ -773,6 +802,11 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
 
 </div>
 <div class="toast" id="toast" role="status"></div>
+<dialog class="reviewdlg" id="reviewDlg" aria-labelledby="reviewTitle">
+  <div class="reviewhead"><div><h2 id="reviewTitle">Document dimension review</h2><p id="reviewMeta"></p></div><button type="button" id="reviewClose" aria-label="Close">✕</button></div>
+  <div class="reviewbody"><p class="reviewsummary" id="reviewSummary"></p><div class="convention" id="reviewConvention"></div><div id="reviewDimensions"></div><div class="auditgrid"><section class="auditbox"><h3>Anomalies and considerations</h3><ul id="reviewAnomalies"></ul></section><section class="auditbox"><h3>Recommended checks</h3><ul id="reviewRecommendations"></ul></section></div></div>
+  <div class="reviewfoot"><span class="hint" id="reviewSelection"></span><div class="row" style="margin:0"><button type="button" id="reviewCancel">Cancel</button><button type="button" class="primary" id="reviewImport">Import selected sizes</button></div></div>
+</dialog>
 <dialog class="propdlg" id="propDlg" aria-labelledby="propTitle">
   <div class="prophead"><div><h2 id="propTitle"></h2><p id="propSub"></p></div>
     <div class="row" style="margin:0"><button type="button" id="propPrev" aria-label="Previous size">‹</button><button type="button" id="propNext" aria-label="Next size">›</button><button type="button" id="propClose" aria-label="Close">✕</button></div></div>
@@ -1536,6 +1570,45 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   $('planOpen').onclick=()=>{const c=planFrom($('planIn').value);if(!c){toast('Paste a link that ends in #plan=…');return;}openPlan(c,false).then(ok=>{if(ok){$('planIn').value='';$('openBox').open=false;}});};
   $('planIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('planOpen').click();});
 
+  // ---------- named plans: unlisted view links, browser-held edit keys ----------
+  let currentSavedId='';
+  const ownedPlans=()=>{try{const v=JSON.parse(localStorage.getItem('adapt-owned-plans')||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
+  const savedLink=id=>location.origin+location.pathname+'?saved='+encodeURIComponent(id);
+  function rememberOwned(plan){const rows=ownedPlans().filter(x=>x.id!==plan.id);rows.unshift({id:plan.id,name:plan.name,editKey:plan.editKey||'',updatedAt:plan.updatedAt});try{localStorage.setItem('adapt-owned-plans',JSON.stringify(rows.slice(0,30)))}catch(e){}renderOwnedPlans();}
+  function renderOwnedPlans(){const rows=ownedPlans();$('savedList').innerHTML=rows.length?rows.map(x=>'<div class="saveditem"><span class="savedname" title="'+esc(x.name)+'">'+esc(x.name)+'</span><button type="button" data-open-saved="'+esc(x.id)+'">Open</button><button type="button" data-share-saved="'+esc(x.id)+'">Share</button></div>').join(''):'<span class="hint">No named plans saved in this browser yet.</span>';}
+  async function openSavedPlan(id,fromLink){
+    try{const r=await fetch('/api/plans/'+encodeURIComponent(id),{headers:{Accept:'application/json'}}),data=await r.json();if(!r.ok)throw new Error(data.error||'Plan not found');
+      applyState(data.plan);currentSavedId=data.id;$('planName').value=data.name;$('saveBox').open=true;$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
+      $('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();toast(fromLink?'Opened the saved plan':'Plan opened');return true;
+    }catch(e){toast(e.message||'That saved plan could not be opened');return false;}}
+  $('savePlan').onclick=async()=>{
+    const name=$('planName').value.trim();if(!name){$('planName').focus();toast('Give the plan a name');return;}
+    const owned=ownedPlans().find(x=>x.id===currentSavedId&&x.editKey),updating=!!owned;
+    const btn=$('savePlan');btn.disabled=true;$('savedStatus').textContent=updating?'Updating…':'Saving…';
+    try{const r=await fetch(updating?'/api/plans/'+currentSavedId:'/api/plans',{method:updating?'PUT':'POST',headers:{'Content-Type':'application/json',...(updating?{'X-Adapt-Plan-Key':owned.editKey}:{})},body:JSON.stringify({name,plan:getState()})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Plan could not be saved');
+      currentSavedId=data.id;rememberOwned({...data,editKey:data.editKey||owned?.editKey});$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();history.replaceState(null,'',location.pathname+'?saved='+data.id);toast(updating?'Plan updated':'Plan saved');
+    }catch(e){$('savedStatus').textContent=e.message||'Plan could not be saved';toast('Plan not saved');}finally{btn.disabled=false;}};
+  $('shareSaved').onclick=()=>{if(currentSavedId)copy(savedLink(currentSavedId),'Saved plan link copied. Anyone with the link can open a copy.');};
+  $('savedList').onclick=e=>{const open=e.target.closest('[data-open-saved]'),share=e.target.closest('[data-share-saved]');if(open)openSavedPlan(open.dataset.openSaved,false);if(share)copy(savedLink(share.dataset.shareSaved),'Saved plan link copied.');};
+  renderOwnedPlans();
+
+  // ---------- AI-assisted, review-first document import ----------
+  let reviewFile=null,reviewData=null;
+  $('docInput').onchange=()=>{reviewFile=$('docInput').files[0]||null;$('docName').textContent=reviewFile?reviewFile.name:'No file chosen';$('docReview').disabled=!reviewFile;$('docStatus').className='aistatus';$('docStatus').textContent=reviewFile?'Ready to review. Nothing will be imported automatically.':'Nothing is imported until you approve the review.';};
+  $('docReview').onclick=async()=>{if(!reviewFile)return;const btn=$('docReview');btn.disabled=true;$('docStatus').className='aistatus busy';$('docStatus').textContent='Reading the whole document and checking dimension conventions…';
+    try{const r=await fetch('/api/review-dimensions',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-File-Name':encodeURIComponent(reviewFile.name),'X-File-Type':reviewFile.type||'application/octet-stream'},body:reviewFile});const data=await r.json();if(!r.ok)throw new Error(data.error||'The document could not be reviewed');reviewData=data;showReview(data);$('docStatus').className='aistatus';$('docStatus').textContent='Review complete. Check the findings before importing.';}
+    catch(e){$('docStatus').className='aistatus err';$('docStatus').textContent=e.message||'The document could not be reviewed.';}finally{btn.disabled=false;}};
+  function showReview(data){const r=data.review,dims=r.dimensions||[];$('reviewMeta').textContent=data.filename+' · '+dims.length+' possible dimension'+(dims.length===1?'':'s')+' found';$('reviewSummary').textContent=r.summary;
+    const conv={width_height:'Width × height',height_width:'Height × width',mixed:'Mixed order',unknown:'Order not established'}[r.documentConvention.order]||r.documentConvention.order;
+    $('reviewConvention').innerHTML='<b>Document convention:</b> '+esc(conv)+' · '+esc(r.documentConvention.units)+'<br>'+esc(r.documentConvention.evidence);
+    $('reviewDimensions').innerHTML=dims.length?'<table class="reviewtable"><thead><tr><th>Use</th><th>Read as</th><th>Status</th><th>Source</th><th>Why</th></tr></thead><tbody>'+dims.map((d,i)=>{const usable=Number.isFinite(d.width)&&Number.isFinite(d.height)&&d.width>0&&d.height>0&&d.status!=='physical_review';const px=d.unit==='px'||d.unit==='unknown';const equivalents=d.status==='physical_review'?'<br><span class="hint">300 dpi: '+esc(d.pixelEquivalent300||'—')+' · 500 dpi: '+esc(d.pixelEquivalent500||'—')+'</span>':'';return '<tr class="'+(d.status==='physical_review'?'physical':d.status==='review'?'attn':'')+'"><td><input type="checkbox" data-review-i="'+i+'" '+(usable&&px&&d.status==='ready'?'checked ':'')+(!usable||!px?'disabled ':'')+'aria-label="Import '+esc(d.raw)+'"></td><td><code>'+esc(d.width==null?'?':d.width)+' × '+esc(d.height==null?'?':d.height)+' '+esc(d.unit)+'</code><br><span class="hint">Raw: '+esc(d.raw)+'</span>'+equivalents+'</td><td><span class="reviewtag '+esc(d.status)+'">'+esc(d.status.replace('_',' '))+'</span><br><span class="hint">'+esc(d.confidence)+' confidence</span></td><td class="source">'+esc(d.source)+'</td><td class="explain">'+esc(d.interpretation)+'</td></tr>';}).join('')+'</tbody></table>':'<p class="empty">No credible dimensions were found.</p>';
+    $('reviewAnomalies').innerHTML=(r.anomalies||[]).length?r.anomalies.map(a=>'<li class="'+esc(a.severity)+'"><b>'+esc(a.title)+'</b> — '+esc(a.detail)+(a.sources?.length?' <span class="hint">('+esc(a.sources.join('; '))+')</span>':'')+'</li>').join(''):'<li>No anomalies were identified.</li>';
+    $('reviewRecommendations').innerHTML=(r.recommendations||[]).length?r.recommendations.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>No additional checks were suggested.</li>';updateReviewSelection();$('reviewDlg').showModal();}
+  function updateReviewSelection(){const n=$('reviewDimensions').querySelectorAll('input[data-review-i]:checked').length;$('reviewSelection').textContent=n+' digital size'+(n===1?'':'s')+' selected';$('reviewImport').disabled=n===0;}
+  $('reviewDimensions').addEventListener('change',updateReviewSelection);
+  $('reviewImport').onclick=()=>{if(!reviewData)return;const chosen=[...$('reviewDimensions').querySelectorAll('input[data-review-i]:checked')].map(x=>reviewData.review.dimensions[+x.dataset.reviewI]);const current=input.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),seen=new Set(parse(input.value).items.map(x=>(+x.w)+'x'+(+x.h)));let added=0;for(const d of chosen){const value=(+d.width)+'x'+(+d.height);if(!seen.has(value)){current.push(value);seen.add(value);added++;}}setLines(current);renderGrid();$('reviewDlg').close();toast(added?'Imported '+added+' new size'+(added===1?'':'s'):'Those sizes are already in the plan');};
+  $('reviewClose').onclick=$('reviewCancel').onclick=()=>$('reviewDlg').close();
+
   // ---------- downloads ----------
   const settingsList=()=>[['Allow downscaling',$('allowDown').checked?'On':'Off'],['Crop to fill',$('cropOn').checked?'On, up to '+$('cropTol').value+'% cropped':'Off'],
     ['Float with tramlines',$('floatOn').checked?'On, up to '+$('floatTol').value+'% empty':'Off'],['Allow upscaling',$('allowUp').checked?'On':'Off'],['Portrait and landscape as one',$('merge').checked?'On':'Off'],
@@ -2089,8 +2162,10 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   // keep the grid in step with anything else that changes the sizes (example, clear, shared plans)
   setTimeout(()=>renderGrid(),0);
 
+  const savedCode=new URLSearchParams(location.search).get('saved');
   const hashCode=planFrom(location.hash);
-  if(!hashCode){try{const st=JSON.parse(localStorage.getItem('ar-state')||'null');
+  if(savedCode&&/^[A-Za-z0-9_-]{16}$/.test(savedCode))openSavedPlan(savedCode,true);
+  else if(!hashCode){try{const st=JSON.parse(localStorage.getItem('ar-state')||'null');
     if(st&&applyState(st)){if(input.value.trim())$('restored').hidden=false;}
     else{const d=localStorage.getItem('ar-draft');if(d&&d.trim()){input.value=d;$('restored').hidden=false;}}}catch(e){}}
   else openPlan(hashCode,true);

@@ -1,0 +1,6 @@
+Media owner,Format,Width,Height,Unit,Notes
+Example Digital,Landscape,1920,1080,px,Standard width by height
+Example Digital,Portrait,1080,1920,px,Standard width by height
+Example Legacy,Compact,1020x768,,,No unit supplied
+Example Print,48 sheet,6,3,m,Printed billboard
+Example Anomaly,Possible swapped values,250,1920,px,Header says height before width

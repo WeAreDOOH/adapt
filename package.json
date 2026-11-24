@@ -5,7 +5,7 @@
   "description": "Adapt. — a protected aspect-ratio planner and artwork export toolkit for DOOH production.",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "start": "node server.mjs",
+    "start": "node --env-file-if-exists=.env.local server.mjs",
     "test:auth": "node --test tests/*.test.mjs",
     "test": "python3 tests/smoke_test.py"
   },

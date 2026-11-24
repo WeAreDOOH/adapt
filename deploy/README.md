@@ -13,6 +13,11 @@ manage that email list inside Adapt. No Entra object ID is bound to an applicati
 Roles and organisation permissions remain in SQLite. The service is memory-capped and can
 write only to `/var/www/adapt/shared` for that database.
 
+AI document review reads `OPENAI_API_KEY` from `/var/www/adapt/shared/ai.env`. The key is
+server-side only. Uploaded files are limited to 10 MB, sent to the OpenAI Responses API with
+response storage disabled, and the public demo endpoint is rate limited. Named plan payloads
+are stored in the shared SQLite database; view IDs and edit keys are generated independently.
+
 `ADAPT_AUTH_DISABLED=1` is a temporary, reversible production switch. While set, the
 planner is served directly at `/`, bearer authentication is bypassed only for the planner,
 and the user-administration page and API remain unavailable. Remove the setting to restore

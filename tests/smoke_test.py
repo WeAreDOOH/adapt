@@ -50,6 +50,9 @@ with sync_playwright() as p:
     check("example: 15 ratios", pg.inner_text("#stRatios") == "15")
     check("default settings: 15 files", n() == "15", n())
     check("spec verified", pg.inner_text("#verdict").startswith("Verified"), pg.inner_text("#verdict"))
+    check("review-first document import is present", pg.is_visible("#aiImport") and pg.is_disabled("#docReview"))
+    pg.click("#saveBox summary")
+    check("named plan controls are present", pg.is_visible("#planName") and pg.is_visible("#savePlan"))
 
     toggle(pg, "allowDown"); check("downscaling off: 30 files", n() == "30", n()); toggle(pg, "allowDown")
     toggle(pg, "cropOn");    check("crop on: 12 files", n() == "12", n())

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import http from "node:http";
 import path from "node:path";
 import { openAdaptDatabase } from "./lib/database.mjs";
@@ -11,6 +12,9 @@ const tenantId = process.env.ENTRA_TENANT_ID?.trim() || "";
 const spaClientId = process.env.ENTRA_SPA_CLIENT_ID?.trim() || "";
 const apiClientId = process.env.ENTRA_API_CLIENT_ID?.trim() || "";
 const databasePath = path.resolve(process.env.ADAPT_DB_PATH || "data/adapt.sqlite");
+const openAiKey = process.env.OPENAI_API_KEY?.trim() || "";
+const openAiModel = process.env.ADAPT_OPENAI_MODEL?.trim() || "gpt-5.4-mini";
+const reviewLimits = new Map();
 const verifier = authDisabled ? null : createEntraVerifier({ tenantId, spaClientId, apiClientId });
 const database = openAdaptDatabase(databasePath, {
   bootstrapEmail: process.env.ADAPT_BOOTSTRAP_EMAIL || "",
@@ -42,6 +46,49 @@ const server = http.createServer(async (request, response) => {
       if (authDisabled) return json(response, 200, { authDisabled: true, user: null });
       const user = await requireActiveUser(request);
       return json(response, 200, { user });
+    }
+    if (url.pathname === "/api/review/config" && request.method === "GET") {
+      return json(response, 200, { enabled: Boolean(openAiKey), maxBytes: 10_000_000 });
+    }
+    if (url.pathname === "/api/review-dimensions" && request.method === "POST") {
+      if (!openAiKey) return json(response, 503, { error: "AI document review is not configured yet." });
+      if (!authDisabled) await requireActiveUser(request);
+      enforceReviewRateLimit(request);
+      try {
+        const filename = safeFilename(request.headers["x-file-name"]);
+        const mimeType = safeMimeType(request.headers["x-file-type"], filename);
+        const bytes = await readBody(request, 10_000_000);
+        if (!bytes.length) throw new Error("Choose a document to review.");
+        return json(response, 200, await reviewDimensions({ filename, mimeType, bytes }));
+      } catch (reason) {
+        return json(response, 400, { error: errorMessage(reason) });
+      }
+    }
+    if (url.pathname === "/api/plans" && request.method === "POST") {
+      try {
+        const body = await readJson(request, 300_000);
+        return json(response, 201, database.createPlan(body.name, body.plan));
+      } catch (reason) {
+        return json(response, 400, { error: errorMessage(reason) });
+      }
+    }
+    const savedPlanMatch = url.pathname.match(/^\/api\/plans\/([A-Za-z0-9_-]{16})$/);
+    if (savedPlanMatch && request.method === "GET") {
+      try {
+        const plan = database.getPlan(savedPlanMatch[1]);
+        return plan ? json(response, 200, plan) : json(response, 404, { error: "That saved plan was not found." });
+      } catch (reason) {
+        return json(response, 400, { error: errorMessage(reason) });
+      }
+    }
+    if (savedPlanMatch && request.method === "PUT") {
+      try {
+        const body = await readJson(request, 300_000);
+        const plan = database.updatePlan(savedPlanMatch[1], request.headers["x-adapt-plan-key"], body.name, body.plan);
+        return json(response, 200, plan);
+      } catch (reason) {
+        return json(response, 403, { error: errorMessage(reason) });
+      }
     }
     if (url.pathname === "/api/planner" && request.method === "GET") {
       if (!authDisabled) await requireActiveUser(request);
@@ -131,24 +178,145 @@ function requirePermission(user, permission) {
   if (!allowed) throw new ApplicationAccessError("Owner access is required.");
 }
 
-async function readJson(request) {
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of request) {
-    size += chunk.length;
-    if (size > 16_384) throw new Error("The request is too large.");
-    chunks.push(chunk);
-  }
+async function readJson(request, limit = 16_384) {
+  const bytes = await readBody(request, limit);
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+    return JSON.parse(bytes.toString("utf8") || "{}");
   } catch {
     throw new Error("The request body is not valid JSON.");
   }
 }
 
-function errorMessage(reason) {
-  return reason instanceof Error ? reason.message : "The user list could not be updated.";
+async function readBody(request, limit) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > limit) throw new Error("The file or request is too large.");
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
+
+function errorMessage(reason) {
+  return reason instanceof Error ? reason.message : "Adapt could not complete this request.";
+}
+
+function safeFilename(value) {
+  let filename = typeof value === "string" ? value : "";
+  try { filename = decodeURIComponent(filename); } catch {}
+  filename = path.basename(filename).replace(/[^A-Za-z0-9._() -]/g, "_").slice(0, 180);
+  if (!filename || !/\.(pdf|csv|tsv|xls|xlsx|doc|docx|rtf|odt|txt|md|ppt|pptx)$/i.test(filename)) {
+    throw new Error("Use a PDF, spreadsheet, Word document, PowerPoint or text file.");
+  }
+  return filename;
+}
+
+function safeMimeType(value, filename) {
+  const supplied = typeof value === "string" ? value.split(";")[0].trim() : "";
+  if (/^[\w.+-]+\/[\w.+-]+$/.test(supplied) && supplied !== "application/octet-stream") return supplied;
+  const ext = path.extname(filename).toLowerCase();
+  return ({
+    ".pdf": "application/pdf", ".csv": "text/csv", ".tsv": "text/tsv", ".txt": "text/plain", ".md": "text/markdown",
+    ".xls": "application/vnd.ms-excel", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".doc": "application/msword", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".ppt": "application/vnd.ms-powerpoint", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".rtf": "application/rtf", ".odt": "application/vnd.oasis.opendocument.text",
+  })[ext] || "text/plain";
+}
+
+function enforceReviewRateLimit(request) {
+  const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  const address = forwarded || request.socket.remoteAddress || "unknown";
+  const key = createHash("sha256").update(address).digest("hex").slice(0, 16);
+  const now = Date.now();
+  const recent = (reviewLimits.get(key) || []).filter((time) => now - time < 60 * 60 * 1000);
+  if (recent.length >= 10 || recent.filter((time) => now - time < 5 * 60 * 1000).length >= 4) {
+    throw new Error("Too many document reviews from this connection. Try again later.");
+  }
+  recent.push(now);
+  reviewLimits.set(key, recent);
+}
+
+async function reviewDimensions({ filename, mimeType, bytes }) {
+  const fileData = `data:${mimeType};base64,${bytes.toString("base64")}`;
+  const apiResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: openAiModel,
+      store: false,
+      input: [{ role: "user", content: [
+        { type: "input_file", filename, file_data: fileData, ...(mimeType === "application/pdf" ? { detail: "high" } : {}) },
+        { type: "input_text", text: DIMENSION_REVIEW_PROMPT },
+      ] }],
+      text: { format: { type: "json_schema", name: "screen_dimension_review", strict: true, schema: DIMENSION_REVIEW_SCHEMA } },
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  const data = await apiResponse.json().catch(() => ({}));
+  if (!apiResponse.ok) {
+    const message = data?.error?.message || "The AI review could not be completed.";
+    throw new Error(message.replace(/\bsk-[A-Za-z0-9_-]+\b/g, "[redacted]"));
+  }
+  const output = (data.output || []).flatMap((item) => item.content || []).find((part) => part.type === "output_text")?.text;
+  if (!output) throw new Error("The AI review returned no readable result.");
+  const review = JSON.parse(output);
+  return { filename, model: openAiModel, reviewedAt: new Date().toISOString(), review };
+}
+
+const DIMENSION_REVIEW_PROMPT = `You are a meticulous out-of-home advertising artwork planner. Inspect the entire uploaded file for screen, canvas, artwork, placement and print dimensions. Return a verbose audit, not a terse extraction.
+
+Rules:
+- Never silently assume a number pair is a screen size. Explain the surrounding evidence.
+- Detect width and height in separate columns, separate rows, tables, merged headings, worksheets, pages and prose.
+- Detect compact forms such as 1020x768, 1020 × 768, 1020*768 and values without units.
+- For unitless digital-looking integer pairs, state whether you inferred pixels and whether the document establishes the industry-standard width × height order. If it does not, flag the order as an assumption.
+- Flag headers or evidence that use height before width, mixed order, swapped orientations, inconsistent units, duplicates, near-duplicates, malformed values, missing values and dimensions that look implausible.
+- Treat physical print dimensions as physical. Do not pretend they are pixels. Give 300 and 500 DPI pixel equivalents when the unit permits conversion, but keep status physical_review.
+- Distinguish genuine dimensions from ratios, dates, quantities, file sizes, prices and unrelated number pairs.
+- One result row per distinct source occurrence. Preserve source location using worksheet/page/table/row/cell language as precisely as possible.
+- Ready means safe to import as pixel width × height. Review means a human should confirm order, unit or context. Physical_review always needs a production decision.
+- Recommendations must tell the artwork producer what to confirm before import.`;
+
+const DIMENSION_REVIEW_SCHEMA = {
+  type: "object", additionalProperties: false,
+  required: ["summary", "documentConvention", "dimensions", "anomalies", "recommendations"],
+  properties: {
+    summary: { type: "string" },
+    documentConvention: {
+      type: "object", additionalProperties: false, required: ["order", "units", "evidence"],
+      properties: {
+        order: { type: "string", enum: ["width_height", "height_width", "mixed", "unknown"] },
+        units: { type: "string" }, evidence: { type: "string" },
+      },
+    },
+    dimensions: {
+      type: "array", items: {
+        type: "object", additionalProperties: false,
+        required: ["width", "height", "unit", "raw", "source", "interpretation", "confidence", "status", "pixelEquivalent300", "pixelEquivalent500"],
+        properties: {
+          width: { type: ["number", "null"] }, height: { type: ["number", "null"] },
+          unit: { type: "string", enum: ["px", "mm", "cm", "m", "in", "ft", "unknown"] },
+          raw: { type: "string" }, source: { type: "string" }, interpretation: { type: "string" },
+          confidence: { type: "string", enum: ["high", "medium", "low"] },
+          status: { type: "string", enum: ["ready", "review", "physical_review"] },
+          pixelEquivalent300: { type: ["string", "null"] }, pixelEquivalent500: { type: ["string", "null"] },
+        },
+      },
+    },
+    anomalies: {
+      type: "array", items: {
+        type: "object", additionalProperties: false, required: ["severity", "title", "detail", "sources"],
+        properties: {
+          severity: { type: "string", enum: ["info", "warning", "critical"] },
+          title: { type: "string" }, detail: { type: "string" }, sources: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+    recommendations: { type: "array", items: { type: "string" } },
+  },
+};
 
 async function serve(response, method, file, contentType) {
   const data = await readFile(path.join(staticRoot, file));
