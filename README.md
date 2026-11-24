@@ -2,6 +2,8 @@
 
 Adapt is a client-demo creative versioning studio for turning one prepared layered source into a coherent family of DOOH layouts. It demonstrates semantic layer mapping, responsive artboards, background bleed and focal positioning, shared copy and intelligent type fitting, logo anchoring, layout guides, scope-aware overrides, and deliberate refinement of similar aspect ratios.
 
+The format catalogue uses the supplied Deliver export unchanged: 1,503 production specifications from 121 media owners, covering 549 unique pixel dimensions and 320 exact aspect ratios. The searchable catalogue can add any one of these specifications to the live artboard set.
+
 ## Run locally
 
 ```bash
@@ -27,6 +29,8 @@ npm run check
 - `src/importers/` — modular adapters. PSD is available; After Effects, InDesign and Figma are explicit planned seams.
 - `src/components/Artboard.tsx` — deterministic responsive preview shared by every format.
 - `src/core/sample.ts` — client-safe sample campaign and curated OOH formats used only when no real PSD has been imported.
+- `src/core/catalog.ts` — quoted-CSV parsing, validation metadata, family classification and catalogue summaries.
+- `public/data/deliver_unique_format_sizes.csv` — unchanged Deliver format source supplied on 24 November 2026.
 
 The cascade resolves `Global → family → local`, preserving deliberate exceptions while shared edits keep flowing. Export produces a portable versioned JSON DCO template.
 

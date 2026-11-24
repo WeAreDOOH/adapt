@@ -1,13 +1,14 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlignHorizontalSpaceAround, Archive, Check, ChevronDown, CircleHelp, Cloud, Download, Eye,
-  FileImage, FileStack, Focus, Grid2X2, ImagePlus, Layers3, LayoutGrid, LockKeyhole, MapPin,
-  Menu, PanelLeftClose, RotateCcw, ScanLine, Settings2, ShieldCheck, SlidersHorizontal,
-  Sparkles, Type, Upload, WandSparkles,
+  Database, FileImage, FileStack, Focus, Grid2X2, ImagePlus, Layers3, LayoutGrid, LockKeyhole, MapPin,
+  Menu, PanelLeftClose, Plus, RotateCcw, ScanLine, Search, Settings2, ShieldCheck, SlidersHorizontal,
+  Sparkles, Type, Upload, WandSparkles, X,
 } from "lucide-react";
 import { Artboard } from "./components/Artboard";
 import { applyScopedPatch, type Anchor, type DcoTemplate, type LayerRole, type LayerStyle, type ScopeMode, refineFamilyPatch, resolveLayer, similarFormats } from "./core/schema";
 import { createSampleTemplate } from "./core/sample";
+import { parseFormatCatalog, summariseCatalog, type CatalogFormat } from "./core/catalog";
 import { psdAdapter } from "./importers";
 
 const ROLE_LABELS: Record<LayerRole, string> = {
@@ -41,12 +42,36 @@ export function App() {
   const [tints, setTints] = useState(false);
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState("Sample campaign ready — eight formats adapted from one prepared layout.");
+  const [catalog, setCatalog] = useState<CatalogFormat[]>([]);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogOwner, setCatalogOwner] = useState("All media owners");
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/data/deliver_unique_format_sizes.csv")
+      .then((response) => {
+        if (!response.ok) throw new Error(`Catalogue returned ${response.status}`);
+        return response.text();
+      })
+      .then((text) => setCatalog(parseFormatCatalog(text)))
+      .catch((error) => setNotice(`Format catalogue unavailable: ${error instanceof Error ? error.message : "could not read CSV"}.`));
+  }, []);
 
   const activeFormat = template.formats.find((format) => format.id === activeFormatId) || template.formats[0];
   const selectedLayer = template.layers.find((layer) => layer.id === selectedLayerId) || template.layers[0];
   const selectedStyle = resolveLayer(template, selectedLayer.id, activeFormat);
   const neighbours = useMemo(() => similarFormats(template, activeFormat), [template, activeFormat]);
+  const catalogSummary = useMemo(() => summariseCatalog(catalog), [catalog]);
+  const catalogOwners = useMemo(() => ["All media owners", ...new Set(catalog.map((format) => format.mediaOwner))].sort(), [catalog]);
+  const filteredCatalog = useMemo(() => {
+    const query = catalogQuery.trim().toLowerCase();
+    return catalog.filter((format) => {
+      const ownerMatch = catalogOwner === "All media owners" || format.mediaOwner === catalogOwner;
+      const textMatch = !query || `${format.mediaOwner} ${format.name} ${format.width}x${format.height} ${format.aspectRatio}`.toLowerCase().includes(query);
+      return ownerMatch && textMatch;
+    }).slice(0, 80);
+  }, [catalog, catalogOwner, catalogQuery]);
 
   function patchSelected(patch: Partial<LayerStyle>) {
     setTemplate((current) => applyScopedPatch(current, selectedLayer.id, patch, scope, activeFormat));
@@ -95,6 +120,15 @@ export function App() {
     };
     setTemplate((current) => refineFamilyPatch(current, selectedLayer.id, patch, activeFormat));
     setNotice(`${selectedLayer.name} refined across ${neighbours.length} closely matched ${activeFormat.family} formats.`);
+  }
+
+  function addCatalogFormat(format: CatalogFormat) {
+    setTemplate((current) => current.formats.some((candidate) => candidate.id === format.id)
+      ? current
+      : { ...current, formats: [...current.formats, format] });
+    setActiveFormatId(format.id);
+    setCatalogOpen(false);
+    setNotice(`${format.name} added from the Deliver catalogue at ${format.width} × ${format.height}.`);
   }
 
   return (
@@ -156,11 +190,12 @@ export function App() {
 
         <section className="stage-area">
           <div className="stage-toolbar">
-            <div><small>RESPONSIVE ARTBOARDS</small><strong>{template.formats.length} live formats</strong></div>
+            <div><small>RESPONSIVE ARTBOARDS</small><strong>{template.formats.length} live formats · {catalogSummary.specifications.toLocaleString()} catalogue</strong></div>
             <div className="scope-switch" aria-label="Edit scope">
               {(["global", "family", "local"] as ScopeMode[]).map((mode) => <button key={mode} className={scope === mode ? "active" : ""} onClick={() => setScope(mode)}>{mode}</button>)}
             </div>
             <div className="view-actions">
+              <button className="catalog-button" onClick={() => setCatalogOpen(true)}><Database size={15} /> Browse catalogue</button>
               <button className={guides ? "active" : ""} onClick={() => setGuides((value) => !value)}><ScanLine size={15} /> Guides</button>
               <button className={tints ? "active" : ""} onClick={() => setTints((value) => !value)}><Grid2X2 size={15} /> Layout tints</button>
               <button><Eye size={15} /> Preview</button>
@@ -242,6 +277,41 @@ export function App() {
           <section className="verification-card"><ShieldCheck size={19} /><div><strong>Layout verified</strong><span>No crop, overflow or safe-area conflicts detected.</span></div><span>8/8</span></section>
         </aside>
       </main>
+
+      {catalogOpen && (
+        <div className="catalog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCatalogOpen(false); }}>
+          <section className="catalog-dialog" role="dialog" aria-modal="true" aria-label="Deliver format catalogue">
+            <header>
+              <div><span className="catalog-icon"><Database size={18} /></span><div><small>DELIVER FORMAT CATALOGUE</small><strong>Choose a production format</strong></div></div>
+              <button aria-label="Close catalogue" onClick={() => setCatalogOpen(false)}><X size={18} /></button>
+            </header>
+            <div className="catalog-stats">
+              <div><strong>{catalogSummary.specifications.toLocaleString()}</strong><span>specifications</span></div>
+              <div><strong>{catalogSummary.uniqueDimensions.toLocaleString()}</strong><span>unique dimensions</span></div>
+              <div><strong>{catalogSummary.uniqueRatios.toLocaleString()}</strong><span>aspect ratios</span></div>
+              <div><strong>{catalogSummary.mediaOwners.toLocaleString()}</strong><span>media owners</span></div>
+            </div>
+            <div className="catalog-filters">
+              <label><Search size={15} /><input autoFocus value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search format, dimensions, ratio or owner" /></label>
+              <select value={catalogOwner} onChange={(event) => setCatalogOwner(event.target.value)}>{catalogOwners.map((owner) => <option key={owner}>{owner}</option>)}</select>
+            </div>
+            <div className="catalog-table" role="table">
+              <div className="catalog-row catalog-head" role="row"><span>Media owner / format</span><span>Dimensions</span><span>Ratio</span><span /></div>
+              {filteredCatalog.map((format) => {
+                const added = template.formats.some((candidate) => candidate.id === format.id);
+                return <div className="catalog-row" role="row" key={format.id}>
+                  <span><strong>{format.name}</strong><small>{format.mediaOwner}</small></span>
+                  <span className="catalog-dimensions">{format.width} × {format.height}</span>
+                  <span><i className={`family-dot ${format.family}`} />{format.aspectRatio}</span>
+                  <button disabled={added} onClick={() => addCatalogFormat(format)}>{added ? <Check size={14} /> : <Plus size={14} />}{added ? "Added" : "Add"}</button>
+                </div>;
+              })}
+              {!filteredCatalog.length && <div className="catalog-empty">No catalogue formats match those filters.</div>}
+            </div>
+            <footer>Showing {filteredCatalog.length.toLocaleString()} of {catalog.filter((format) => catalogOwner === "All media owners" || format.mediaOwner === catalogOwner).length.toLocaleString()} matching specifications. Source rows remain unchanged.</footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
