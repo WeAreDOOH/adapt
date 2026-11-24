@@ -6,11 +6,12 @@ import { AuthenticationError, bearerToken, createEntraVerifier } from "./lib/ent
 
 const port = Number(process.env.PORT || 3103);
 const staticRoot = path.resolve(process.env.ADAPT_STATIC_ROOT || "dist");
+const authDisabled = process.env.ADAPT_AUTH_DISABLED === "1";
 const tenantId = process.env.ENTRA_TENANT_ID?.trim() || "";
 const spaClientId = process.env.ENTRA_SPA_CLIENT_ID?.trim() || "";
 const apiClientId = process.env.ENTRA_API_CLIENT_ID?.trim() || "";
 const databasePath = path.resolve(process.env.ADAPT_DB_PATH || "data/adapt.sqlite");
-const verifier = createEntraVerifier({ tenantId, spaClientId, apiClientId });
+const verifier = authDisabled ? null : createEntraVerifier({ tenantId, spaClientId, apiClientId });
 const database = openAdaptDatabase(databasePath, {
   bootstrapEmail: process.env.ADAPT_BOOTSTRAP_EMAIL || "",
   bootstrapName: process.env.ADAPT_BOOTSTRAP_NAME || "Adapt Owner",
@@ -31,18 +32,23 @@ const server = http.createServer(async (request, response) => {
     if (url.pathname === "/healthz") return json(response, 200, { ok: true });
     if (url.pathname === "/api/auth/config" && request.method === "GET") {
       return json(response, 200, {
+        authDisabled,
         tenantId,
         clientId: spaClientId,
         apiScope: `api://${apiClientId}/access_as_user`,
       });
     }
     if (url.pathname === "/api/me" && request.method === "GET") {
+      if (authDisabled) return json(response, 200, { authDisabled: true, user: null });
       const user = await requireActiveUser(request);
       return json(response, 200, { user });
     }
     if (url.pathname === "/api/planner" && request.method === "GET") {
-      await requireActiveUser(request);
+      if (!authDisabled) await requireActiveUser(request);
       return serve(response, request.method, "index.html", "text/html; charset=utf-8");
+    }
+    if (authDisabled && (url.pathname === "/admin/users" || url.pathname.startsWith("/api/admin/"))) {
+      return json(response, 503, { error: "User administration is unavailable while sign-in is disabled." });
     }
     if (url.pathname === "/api/admin/users" && request.method === "GET") {
       const user = await requireActiveUser(request);
@@ -75,7 +81,12 @@ const server = http.createServer(async (request, response) => {
       return serve(response, request.method, file, type);
     }
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return serve(response, request.method, "login.html", "text/html; charset=utf-8");
+      return serve(
+        response,
+        request.method,
+        authDisabled ? "index.html" : "login.html",
+        "text/html; charset=utf-8",
+      );
     }
     if (url.pathname === "/admin/users") {
       return serve(response, request.method, "users.html", "text/html; charset=utf-8");
@@ -97,6 +108,7 @@ const server = http.createServer(async (request, response) => {
 server.listen(port, "127.0.0.1", () => console.log(`Adapt listening on 127.0.0.1:${port}`));
 
 async function requireActiveUser(request) {
+  if (!verifier) throw new AuthenticationError("Microsoft sign-in is temporarily disabled.", "auth_disabled");
   const identity = await verifier.verify(bearerToken(request));
   const user = database.authorize(identity);
   if (!user) {

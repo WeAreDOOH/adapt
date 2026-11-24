@@ -13,5 +13,10 @@ manage that email list inside Adapt. No Entra object ID is bound to an applicati
 Roles and organisation permissions remain in SQLite. The service is memory-capped and can
 write only to `/var/www/adapt/shared` for that database.
 
+`ADAPT_AUTH_DISABLED=1` is a temporary, reversible production switch. While set, the
+planner is served directly at `/`, bearer authentication is bypassed only for the planner,
+and the user-administration page and API remain unavailable. Remove the setting to restore
+the Microsoft sign-in flow after the Adapt Entra registrations are configured.
+
 The temporary certificate-issuance host is `deploy/nginx/adapt-http.conf`; the final TLS host
 is `deploy/nginx/adapt.conf`.

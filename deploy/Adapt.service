@@ -12,6 +12,7 @@ Environment=NODE_ENV=production
 Environment=PORT=3103
 Environment=ADAPT_STATIC_ROOT=/var/www/adapt/current/dist
 Environment=ADAPT_DB_PATH=/var/www/adapt/shared/adapt.sqlite
+Environment=ADAPT_AUTH_DISABLED=1
 EnvironmentFile=/var/www/adapt/shared/auth.env
 ExecStart=/usr/bin/node --max-old-space-size=64 server.mjs
 Restart=always
