@@ -6,6 +6,7 @@ import {
   Sparkles, Type, Upload, WandSparkles, X,
 } from "lucide-react";
 import { Artboard } from "./components/Artboard";
+import { DemoWorkflow } from "./components/DemoWorkflow";
 import { applyScopedPatch, type Anchor, type DcoTemplate, type LayerRole, type LayerStyle, type ScopeMode, refineFamilyPatch, resolveLayer, similarFormats } from "./core/schema";
 import { createSampleTemplate } from "./core/sample";
 import { parseFormatCatalog, summariseCatalog, type CatalogFormat } from "./core/catalog";
@@ -34,6 +35,7 @@ function downloadJson(template: DcoTemplate) {
 }
 
 export function App() {
+  const [workflowComplete, setWorkflowComplete] = useState(false);
   const [template, setTemplate] = useState(createSampleTemplate);
   const [activeFormatId, setActiveFormatId] = useState("portrait-d6");
   const [selectedLayerId, setSelectedLayerId] = useState("headline");
@@ -131,12 +133,23 @@ export function App() {
     setNotice(`${format.name} added from the Deliver catalogue at ${format.width} × ${format.height}.`);
   }
 
+  if (!workflowComplete) {
+    return <DemoWorkflow onOpenStudio={(nextTemplate, nextNotice) => {
+      setTemplate(nextTemplate);
+      setActiveFormatId(nextTemplate.formats[0]?.id || "");
+      setSelectedLayerId(nextTemplate.layers.find((layer) => layer.role === "headline")?.id || nextTemplate.layers[0]?.id || "");
+      setNotice(nextNotice);
+      setWorkflowComplete(true);
+    }} />;
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand"><span className="brand-mark">A</span><strong>ADAPT</strong><em>Creative versioning studio</em></div>
-        <div className="project-identity"><span>Northstar / Autumn 26</span><strong>{template.name}</strong></div>
+        <div className="project-identity"><span>Responsive campaign</span><strong>{template.name}</strong></div>
         <div className="top-actions">
+          <button className="new-workflow" onClick={() => setWorkflowComplete(false)}>New import</button>
           <span className="save-state"><Cloud size={15} /> Local draft saved</span>
           <button className="icon-button" title="Help"><CircleHelp size={18} /></button>
           <button className="primary-button" onClick={() => downloadJson(template)}><Download size={15} /> Export DCO template</button>
@@ -163,7 +176,7 @@ export function App() {
           <button className="upload-button" onClick={() => fileInput.current?.click()} disabled={importing}>
             <Upload size={15} /> {importing ? "Reading PSD…" : "Import prepared PSD"}
           </button>
-          <p className="microcopy">PSD files are parsed locally. Nothing is uploaded to a server.</p>
+          <p className="microcopy">The PSD binary stays local. AI analysis receives layer names and geometry only.</p>
 
           <div className="section-title"><span>SEMANTIC MAPPING</span><button title="Mapping settings"><Settings2 size={14} /></button></div>
           <div className="layer-list">
