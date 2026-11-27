@@ -14,6 +14,9 @@ await copyFile(path.resolve("src/msal-client.js"), path.join(outputDirectory, "m
 await copyFile(path.resolve("src/account.js"), path.join(outputDirectory, "account.js"));
 await copyFile(path.resolve("src/users.html"), path.join(outputDirectory, "users.html"));
 await copyFile(path.resolve("src/users.js"), path.join(outputDirectory, "users.js"));
+for (const file of ["approvals.html", "approvals.js", "approvals.css"]) {
+  await copyFile(path.resolve("src", file), path.join(outputDirectory, file));
+}
 await copyFile(
   path.resolve("node_modules/@azure/msal-browser/lib/msal-browser.min.js"),
   path.join(outputDirectory, "msal-browser.min.js"),

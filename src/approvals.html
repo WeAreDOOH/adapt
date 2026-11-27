@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Artwork approvals · Adapt</title>
+  <link rel="stylesheet" href="/approvals.css">
+  <script type="module" src="/approvals.js"></script>
+</head>
+<body>
+  <header class="appbar"><strong class="brand">Adapt<span>.</span></strong><a id="back" hidden>Back to planner</a><span id="role"></span></header>
+  <main>
+    <header class="intro">
+      <p class="eyebrow" id="kicker">Artwork approvals</p>
+      <h1 id="title">Opening workspace…</h1>
+      <p id="intro"></p>
+      <p id="status" class="notice" role="status" hidden></p>
+    </header>
+    <section id="workspace" hidden>
+      <div class="section-head"><div><h2>Artwork supplied</h2><p id="coverage"></p></div><div class="actions"><button id="refresh">Refresh</button><button class="primary" id="flight">Run flight check</button></div></div>
+      <div id="queueFilters" class="actions filters" aria-label="Filter artwork">
+        <button data-filter="all" aria-pressed="true">All sizes</button><button data-filter="draft" aria-pressed="false">Ready to submit</button>
+        <button data-filter="changes" aria-pressed="false">Amendments</button><button data-filter="in_review" aria-pressed="false">In review</button>
+      </div>
+      <div id="queue"></div>
+      <details id="archived" hidden><summary>Removed sizes with artwork history</summary><div id="archiveList"></div></details>
+      <section class="rounds">
+        <div class="section-head"><div><h2>Review rounds</h2><p>Each link opens the artwork submitted in that round.</p></div></div>
+        <div id="rounds"></div>
+      </section>
+    </section>
+    <section id="viewer" hidden>
+      <div id="navigation" class="section-head navigation">
+        <div class="actions"><button id="previous">Previous</button><button id="next">Next</button></div>
+        <strong id="position"></strong><span id="decisions"></span>
+      </div>
+      <nav id="creativeList" class="creative-list" aria-label="Submitted artwork"></nav>
+      <div class="section-head viewer-title"><div><h2 id="creativeTitle"></h2><p id="creativeFile"></p></div><button id="backWorkspace" hidden>Back to queue</button></div>
+      <div class="review-layout">
+        <section id="board" class="board" aria-label="Artwork viewer">
+          <div class="toolbar" aria-label="View tools">
+            <button id="fit" title="Fit the artwork in the available space">Fit</button>
+            <button id="zoomOut" aria-label="Zoom out">−</button><output id="zoom"></output><button id="zoomIn" aria-label="Zoom in">+</button>
+            <button id="actual" title="View at original pixel size">100%</button><button id="fullscreen">Full screen</button>
+            <button id="rulers" aria-pressed="false">Rulers</button><button id="grid" aria-pressed="false">Grid</button>
+            <button id="safe" aria-pressed="false" title="Show a 5% inset guide">Safe area</button>
+            <button id="overlayToggle" aria-pressed="true">Markup</button>
+          </div>
+          <div id="drawingTools" class="toolbar drawing" aria-label="Annotation tools">
+            <button data-tool="pan" aria-pressed="true">Pan</button><button data-tool="note" aria-pressed="false">Pin note</button>
+            <button data-tool="pen" aria-pressed="false">Draw</button><button data-tool="arrow" aria-pressed="false">Arrow</button>
+            <button data-tool="box" aria-pressed="false">Box</button>
+            <label>Colour <input type="color" id="colour" value="#ef547d"></label>
+            <label>Brush <select id="brush"><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option></select></label>
+            <button id="undo">Undo</button>
+          </div>
+          <div id="viewport" tabindex="0" aria-label="Artwork canvas">
+            <div id="stage" data-tool="pan">
+              <img id="artwork" alt="" draggable="false">
+              <svg id="markup" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+              <div id="safeFrame" hidden></div>
+              <div id="rulerX" class="ruler ruler-x" hidden></div><div id="rulerY" class="ruler ruler-y" hidden></div>
+            </div>
+          </div>
+          <p id="canvasHelp" class="canvas-help" hidden>Drag from a ruler to add a guide. Drag a guide past the edge to remove it. Use Pan to move around zoomed artwork.</p>
+        </section>
+        <aside class="feedback">
+          <div class="section-head"><h2 id="feedbackTitle">Feedback</h2><span id="decisionBadge"></span></div>
+          <div id="feedbackList"></div>
+          <div id="decisionControls" hidden>
+            <label class="field">Overall feedback<textarea id="comment" rows="3" maxlength="4000" placeholder="Add a summary of the changes…"></textarea></label>
+            <div class="actions"><button id="changes">Request amends</button><button class="primary" id="approve">Approve artwork</button></div>
+            <p id="decisionError" class="notice error" role="status" hidden></p>
+          </div>
+          <div id="history" hidden></div>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <dialog id="flightDialog" aria-labelledby="flightTitle"><form id="flightForm">
+    <h2 id="flightTitle">Flight check</h2><p id="flightSummary"></p><ul id="flightList"></ul>
+    <label class="check"><input type="checkbox" id="checkSpec" required> I checked file dimensions and artwork specifications.</label>
+    <label class="check"><input type="checkbox" id="checkLayout" required> I checked copy, legibility, safe areas and any cropping.</label>
+    <label class="check"><input type="checkbox" id="checkScope" required> I checked the selected sizes and any omissions.</label>
+    <label class="field">Reviewer email<input type="email" id="recipient" required maxlength="254" autocomplete="email"></label>
+    <label class="field">Message to reviewer<textarea id="message" rows="3" maxlength="2000"></textarea></label>
+    <p id="flightError" class="notice error" role="status" hidden></p>
+    <div class="actions"><button type="button" data-close="flightDialog">Cancel</button><button class="primary" id="submitRound">Create review link</button></div>
+  </form></dialog>
+  <dialog id="inviteDialog" aria-labelledby="inviteTitle">
+    <h2 id="inviteTitle">Review link ready</h2>
+    <p id="inviteInfo"></p><label class="field">Private review link<input id="inviteLink" readonly></label>
+    <div class="actions"><button type="button" data-close="inviteDialog">Done</button><button id="copyInvite">Copy link</button><a class="button primary" id="emailInvite">Open email draft</a></div>
+  </dialog>
+  <dialog id="noteDialog" aria-labelledby="noteTitle"><form id="noteForm">
+    <h2 id="noteTitle">Canvas note</h2><label class="field">Describe the amendment<textarea id="noteText" rows="4" maxlength="1000" required></textarea></label>
+    <div class="actions"><button type="button" data-close="noteDialog">Cancel</button><button class="primary">Save note</button></div>
+  </form></dialog>
+</body>
+</html>

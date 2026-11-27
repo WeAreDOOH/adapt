@@ -4,6 +4,8 @@ import http from "node:http";
 import path from "node:path";
 import { openAdaptDatabase } from "./lib/database.mjs";
 import { AuthenticationError, bearerToken, createEntraVerifier } from "./lib/entra.mjs";
+import { ApprovalError, openApprovals } from "./lib/approvals.mjs";
+import { pipeline } from "node:stream/promises";
 
 const port = Number(process.env.PORT || 3103);
 const staticRoot = path.resolve(process.env.ADAPT_STATIC_ROOT || "dist");
@@ -20,6 +22,7 @@ const database = openAdaptDatabase(databasePath, {
   bootstrapEmail: process.env.ADAPT_BOOTSTRAP_EMAIL || "",
   bootstrapName: process.env.ADAPT_BOOTSTRAP_NAME || "Adapt Owner",
 });
+const approvals = openApprovals(path.join(path.dirname(databasePath), "approval-workspace"));
 
 const publicFiles = new Map([
   ["/auth.js", ["auth.js", "text/javascript; charset=utf-8"]],
@@ -27,6 +30,10 @@ const publicFiles = new Map([
   ["/account.js", ["account.js", "text/javascript; charset=utf-8"]],
   ["/users.js", ["users.js", "text/javascript; charset=utf-8"]],
   ["/msal-browser.min.js", ["msal-browser.min.js", "text/javascript; charset=utf-8"]],
+  ["/approvals", ["approvals.html", "text/html; charset=utf-8"]],
+  ["/client-review", ["approvals.html", "text/html; charset=utf-8"]],
+  ["/approvals.js", ["approvals.js", "text/javascript; charset=utf-8"]],
+  ["/approvals.css", ["approvals.css", "text/css; charset=utf-8"]],
 ]);
 
 const server = http.createServer(async (request, response) => {
@@ -34,6 +41,9 @@ const server = http.createServer(async (request, response) => {
     const url = new URL(request.url || "/", "https://adapt.dooh.com");
 
     if (url.pathname === "/healthz") return json(response, 200, { ok: true });
+    if (url.pathname.startsWith("/api/approvals/")) {
+      return await handleApprovals(request, response, url.pathname);
+    }
     if (url.pathname === "/api/auth/config" && request.method === "GET") {
       return json(response, 200, {
         authDisabled,
@@ -140,6 +150,8 @@ const server = http.createServer(async (request, response) => {
     }
     return json(response, 404, { error: "Not found" });
   } catch (reason) {
+    if (response.headersSent) return response.destroy();
+    if (reason instanceof ApprovalError) return json(response, reason.status, { error: reason.message });
     if (reason instanceof AuthenticationError) {
       response.setHeader("WWW-Authenticate", `Bearer error="${reason.code}"`);
       return json(response, 401, { code: reason.code, error: reason.message });
@@ -151,6 +163,67 @@ const server = http.createServer(async (request, response) => {
     return json(response, 500, { error: "Adapt could not complete this request." });
   }
 });
+
+async function handleApprovals(request, response, pathname) {
+  const method = request.method;
+  const ownerRoute = pathname.match(/^\/api\/approvals\/plans\/([A-Za-z0-9_-]{16})(\/.*)?$/);
+  const token = request.headers["x-adapt-review-key"];
+  if (ownerRoute) {
+    const [, plan, action = ""] = ownerRoute;
+    const saved = database.getOwnedPlan(plan, request.headers["x-adapt-plan-key"]);
+    if (!saved) throw new ApprovalError(403, "Open this workspace from the browser that owns the saved plan.");
+    if (!action && method === "GET") return json(response, 200, { title: saved.name, ...approvals.workspace(plan) });
+    if (action === "/formats" && method === "PUT") {
+      const { formats } = (await readJson(request)) ?? {};
+      return json(response, 200, { title: saved.name, ...approvals.setFormats(plan, formats) });
+    }
+    if (action === "/rounds" && method === "POST") {
+      return json(response, 201, approvals.submit(plan, saved.name, await readJson(request, 30_000)));
+    }
+    const revoke = action.match(/^\/rounds\/([A-Za-z0-9_-]{16})$/);
+    if (revoke && method === "DELETE") {
+      approvals.revoke(plan, revoke[1]);
+      return json(response, 200, { ok: true });
+    }
+    const upload = action.match(/^\/artwork\/([0-9]{1,5}x[0-9]{1,5})$/);
+    if (upload && method === "POST") {
+      let filename;
+      try { filename = decodeURIComponent(String(request.headers["x-file-name"] || "")); } catch {}
+      filename = path.basename(filename || "Artwork").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 180);
+      const version = await approvals.upload(plan, upload[1], filename, request);
+      return json(response, 201, version);
+    }
+    const version = action.match(/^\/versions\/([A-Za-z0-9_-]{16})(\/image)?$/);
+    if (version && method === "GET") {
+      return version[2]
+        ? await sendArtwork(response, approvals.artwork(version[1], { plan }))
+        : json(response, 200, approvals.history(plan, version[1]));
+    }
+  }
+  if (pathname === "/api/approvals/review" && method === "GET") {
+    return json(response, 200, approvals.review(token));
+  }
+  const entry = pathname.match(/^\/api\/approvals\/review\/([A-Za-z0-9_-]{16})(\/image|\/decision|\/feedback)$/);
+  if (entry && entry[2] === "/image" && method === "GET") {
+    return await sendArtwork(response, approvals.artwork(entry[1], { token }));
+  }
+  if (entry && entry[2] === "/decision" && method === "POST") {
+    approvals.decide(token, entry[1], await readJson(request, 300_000));
+    return json(response, 200, approvals.review(token));
+  }
+  if (entry && entry[2] === "/feedback" && method === "GET") {
+    return json(response, 200, approvals.feedback(token, entry[1]));
+  }
+  return json(response, 404, { error: "Not found" });
+}
+
+async function sendArtwork(response, image) {
+  response.writeHead(200, {
+    "Content-Type": image.mime, "Content-Length": image.bytes,
+    "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+  });
+  await pipeline(image.stream, response);
+}
 
 server.listen(port, "127.0.0.1", () => console.log(`Adapt listening on 127.0.0.1:${port}`));
 
@@ -183,7 +256,7 @@ async function readJson(request, limit = 16_384) {
   try {
     return JSON.parse(bytes.toString("utf8") || "{}");
   } catch {
-    throw new Error("The request body is not valid JSON.");
+    throw new ApprovalError(400, "The request body is not valid JSON.");
   }
 }
 
@@ -192,7 +265,7 @@ async function readBody(request, limit) {
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > limit) throw new Error("The file or request is too large.");
+    if (size > limit) throw new ApprovalError(413, "The file or request is too large.");
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
@@ -320,16 +393,21 @@ const DIMENSION_REVIEW_SCHEMA = {
 
 async function serve(response, method, file, contentType) {
   const data = await readFile(path.join(staticRoot, file));
-  const mutableAuthenticationAsset = ["auth.js", "msal-client.js", "account.js", "users.js"].includes(file);
+  const mutableAsset = ["auth.js", "msal-client.js", "account.js", "users.js", "approvals.js", "approvals.css"].includes(file);
+  const approvalPage = file === "approvals.html";
   response.writeHead(200, {
     "Content-Type": contentType,
     "Content-Length": data.length,
-    "Cache-Control": file.endsWith(".html") || mutableAuthenticationAsset
+    "Cache-Control": file.endsWith(".html") || mutableAsset
       ? "no-store"
       : "private, max-age=3600, immutable",
     "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Referrer-Policy": approvalPage ? "no-referrer" : "strict-origin-when-cross-origin",
     "X-Frame-Options": "DENY",
+    ...(approvalPage && {
+      "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "X-Robots-Tag": "noindex, nofollow",
+    }),
   });
   response.end(method === "HEAD" ? undefined : data);
 }
@@ -347,7 +425,10 @@ function json(response, status, payload) {
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
-    database.close();
-    server.close(() => process.exit(0));
+    server.close(() => {
+      approvals.close();
+      database.close();
+      process.exit(0);
+    });
   });
 }

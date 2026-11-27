@@ -733,7 +733,13 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
       <div id="paneArt" role="tabpanel" aria-labelledby="cardArt" hidden>
         <div class="pane-head"><h2 class="pane-title">Artwork</h2>
           <div class="row" style="margin:0"><label class="tlpick" title="Default tramline colour, used by every file without its own">Default tramlines <input type="color" id="tlColor2" value="#000000" aria-label="Tramline colour"></label><button type="button" class="pickbtn" data-pick title="Pick a colour from your artwork" aria-label="Pick a tramline colour from your artwork"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14.5 5.5l4 4M17 3l4 4-3 3-4-4 3-3zM14 6L5 15l-1 5 5-1 9-9"/></svg></button><button type="button" id="safeBtn" class="toggle" aria-pressed="true">Safe area</button><button type="button" class="primary" id="dlSizes" hidden aria-label="Download all sizes"><svg class="bi" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>All sizes</button></div></div>
-        <p class="help" style="margin:0 0 12px">Drop finished artwork to see it in every size it covers. Files are matched by their dimensions. Images stay on this device and are cleared when you leave the page.</p>
+        <div class="aiimport" style="margin:0 0 14px">
+          <h3>Artwork approvals</h3>
+          <p class="help">Send exact-size artwork for client review, track amends and keep each version. Save a named plan to start its approval queue.</p>
+          <div class="row"><button type="button" class="primary" id="openApprovals">Open approval queue</button><button type="button" id="stageApprovals">Stage supplied sizes</button></div>
+          <p class="aistatus" id="approvalStatus" role="status" hidden></p>
+        </div>
+        <p class="help" style="margin:0 0 12px">Drop finished artwork to see it in every size it covers. Files are matched by their dimensions. These previews stay on this device until you stage them for approvals.</p>
         <label class="dropzone" id="dropZone"><input type="file" id="artInput" accept="image/png,image/jpeg,image/webp" multiple class="sr">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
           <span><b>Drop artwork here</b> or <u>choose files</u></span><span class="hint">PNG, JPG or WebP</span></label>
@@ -1559,26 +1565,26 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   }
   const planFrom=text=>{const m=String(text).match(/[#?&]plan=([A-Za-z0-9_-]+)/)||String(text).trim().match(/^([zj][A-Za-z0-9_-]{8,})$/);return m?m[1]:null;};
   async function openPlan(code,fromLink){
-    try{const st=await decodePlan(code);applyState(st);$('restored').hidden=true;$('sharedNote').hidden=false;render();toast(fromLink?'Opened the shared plan':'Plan opened');return true;}
+    try{const st=await decodePlan(code);applyState(st);currentSavedId='';$('planName').value='';$('shareSaved').hidden=true;$('savedStatus').textContent='';$('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();toast(fromLink?'Opened the shared plan':'Plan opened');return true;}
     catch(e){toast('That link doesn\'t contain a readable plan');return false;}
   }
   $('shareBtn').onclick=async()=>{
     const code=await encodePlan(getState());
-    const base=location.href.split('#')[0];
+    const base=new URL(location.href);base.hash='';base.searchParams.delete('saved');
     copy(base+'#plan='+code,'Link copied. Anyone you send it to also needs access to this page.');
   };
   $('planOpen').onclick=()=>{const c=planFrom($('planIn').value);if(!c){toast('Paste a link that ends in #plan=…');return;}openPlan(c,false).then(ok=>{if(ok){$('planIn').value='';$('openBox').open=false;}});};
   $('planIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('planOpen').click();});
 
   // ---------- named plans: unlisted view links, browser-held edit keys ----------
-  let currentSavedId='';
+  let currentSavedId='', savedPlanSizes='';
   const ownedPlans=()=>{try{const v=JSON.parse(localStorage.getItem('adapt-owned-plans')||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
   const savedLink=id=>location.origin+location.pathname+'?saved='+encodeURIComponent(id);
   function rememberOwned(plan){const rows=ownedPlans().filter(x=>x.id!==plan.id);rows.unshift({id:plan.id,name:plan.name,editKey:plan.editKey||'',updatedAt:plan.updatedAt});try{localStorage.setItem('adapt-owned-plans',JSON.stringify(rows.slice(0,30)))}catch(e){}renderOwnedPlans();}
   function renderOwnedPlans(){const rows=ownedPlans();$('savedList').innerHTML=rows.length?rows.map(x=>'<div class="saveditem"><span class="savedname" title="'+esc(x.name)+'">'+esc(x.name)+'</span><button type="button" data-open-saved="'+esc(x.id)+'">Open</button><button type="button" data-share-saved="'+esc(x.id)+'">Share</button></div>').join(''):'<span class="hint">No named plans saved in this browser yet.</span>';}
   async function openSavedPlan(id,fromLink){
     try{const r=await fetch('/api/plans/'+encodeURIComponent(id),{headers:{Accept:'application/json'}}),data=await r.json();if(!r.ok)throw new Error(data.error||'Plan not found');
-      applyState(data.plan);currentSavedId=data.id;$('planName').value=data.name;$('saveBox').open=true;$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
+      applyState(data.plan);currentSavedId=data.id;savedPlanSizes=data.plan.sizes;$('planName').value=data.name;$('saveBox').open=true;$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
       $('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();toast(fromLink?'Opened the saved plan':'Plan opened');return true;
     }catch(e){toast(e.message||'That saved plan could not be opened');return false;}}
   $('savePlan').onclick=async()=>{
@@ -1586,7 +1592,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     const owned=ownedPlans().find(x=>x.id===currentSavedId&&x.editKey),updating=!!owned;
     const btn=$('savePlan');btn.disabled=true;$('savedStatus').textContent=updating?'Updating…':'Saving…';
     try{const r=await fetch(updating?'/api/plans/'+currentSavedId:'/api/plans',{method:updating?'PUT':'POST',headers:{'Content-Type':'application/json',...(updating?{'X-Adapt-Plan-Key':owned.editKey}:{})},body:JSON.stringify({name,plan:getState()})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Plan could not be saved');
-      currentSavedId=data.id;rememberOwned({...data,editKey:data.editKey||owned?.editKey});$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();history.replaceState(null,'',location.pathname+'?saved='+data.id);toast(updating?'Plan updated':'Plan saved');
+      currentSavedId=data.id;savedPlanSizes=data.plan.sizes;rememberOwned({...data,editKey:data.editKey||owned?.editKey});$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();history.replaceState(null,'',location.pathname+'?saved='+data.id);toast(updating?'Plan updated':'Plan saved');
     }catch(e){$('savedStatus').textContent=e.message||'Plan could not be saved';toast('Plan not saved');}finally{btn.disabled=false;}};
   $('shareSaved').onclick=()=>{if(currentSavedId)copy(savedLink(currentSavedId),'Saved plan link copied. Anyone with the link can open a copy.');};
   $('savedList').onclick=e=>{const open=e.target.closest('[data-open-saved]'),share=e.target.closest('[data-share-saved]');if(open)openSavedPlan(open.dataset.openSaved,false);if(share)copy(savedLink(share.dataset.shareSaved),'Saved plan link copied.');};
@@ -1904,7 +1910,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   const artMap=new Map();let artLoose=[],safeOn=true;
   const ratioKey=(w,h)=>{const a=Math.round(w),b=Math.round(h),g=gcd(a,b);return (a/g)+':'+(b/g);};
   function loadImage(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
-    img.onload=()=>res({name:file.name,w:img.naturalWidth,h:img.naturalHeight,url,img});img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};img.src=url;});}
+    img.onload=()=>res({name:file.name,w:img.naturalWidth,h:img.naturalHeight,url,img,file});img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};img.src=url;});}
   function matchRow(a){
     const rows=specRows;let r=rows.find(x=>x.F.w===a.w&&x.F.h===a.h);if(r)return {r,how:'exact'};
     const k=ratioKey(a.w,a.h);r=rows.find(x=>ratioKey(x.F.w,x.F.h)===k);if(r)return {r,how:'ratio'};
@@ -1951,9 +1957,9 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     if((z.h-h)%2)h+=mode==='contain'?-1:1;
     return {x:(z.w-w)/2,y:(z.h-h)/2,w,h,s,mode,direct:true,trim:t};
   }
-  function drawPlaced(g,a,row,z,k,tw,th){
-    g.fillStyle=colorFor(row);g.fillRect(0,0,tw,th);
-    const R=artPlace(a,row,z);g.imageSmoothingQuality='high';g.drawImage(a.img,R.x*k,R.y*k,R.w*k,R.h*k);
+  function drawPlaced(g,a,row,z,k,tw,th,placement=artPlace(a,row,z),colour=colorFor(row)){
+    g.fillStyle=colour;g.fillRect(0,0,tw,th);
+    const R=placement;g.imageSmoothingQuality='high';g.drawImage(a.img,R.x*k,R.y*k,R.w*k,R.h*k);
   }
   // how much the supplied pixels are enlarged or reduced to make this size
   // supplied artwork whose shape differs from its file obeys the same settings: it's trimmed only when
@@ -2002,6 +2008,89 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
       if(a&&z){const box=cv.parentElement;drawFit(cv,a,r,z.z,parseFloat(box.style.width),parseFloat(box.style.height));}});
   }
   $('artInput').addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value='';});
+  // Carry the planner's unique sizes and exact artwork renders into a private approval workspace.
+  async function prepareApprovals(stage) {
+    const owns = ownedPlans().find((entry) => entry.id === currentSavedId && entry.editKey);
+    if (!owns || savedPlanSizes !== input.value) {
+      showTab('spec');
+      setTools(true, false);
+      $('saveBox').open = true;
+      $('planName').focus();
+      toast(owns ? 'Save your size changes before opening the approval queue.' : 'Save this plan first to create an approval queue.');
+      return;
+    }
+    if (!allTargets.length) {
+      toast('Add the required sizes before starting approvals.');
+      return;
+    }
+    const base = '/api/approvals/plans/' + owns.id;
+    const status = $('approvalStatus');
+    const controls = [$('openApprovals'), $('stageApprovals')];
+    const pathname = '/approvals?plan=' + owns.id;
+    const formats = allTargets.map(({w, h}) => ({ width: w, height: h }));
+    const settings = { up: $('allowUp').checked, down: $('allowDown').checked, float: $('floatOn').checked };
+    const artwork = specRows.flatMap((row) => {
+      const source = artMap.get(row.F.label);
+      return source ? row.fm.map(({z}) => ({row, source, size: z, placement: artPlace(source, row, z), colour: colorFor(row)})) : [];
+    });
+    if (stage && !artwork.length) {
+      toast('Supply artwork in this tab before staging it.');
+      return;
+    }
+    async function request(url, options) {
+      const response = await fetch(base + url, {
+        ...options, headers: { ...options.headers, 'X-Adapt-Plan-Key': owns.editKey },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Adapt could not stage the artwork (' + response.status + ').');
+      return result;
+    }
+    controls.forEach((control) => {control.disabled = true;});
+    status.hidden = false;
+    status.textContent = 'Preparing the approval queue…';
+    try {
+      const workspace = await request('/formats', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({formats})});
+      if (!stage) {
+        location.assign(pathname);
+        return;
+      }
+      const missing = new Set(workspace.formats.filter((format) => !format.versions.length).map((format) => format.size));
+      const ready = artwork.filter(({size}) => missing.has(size.w + 'x' + size.h));
+      let added = 0;
+      const skipped = [];
+      for (const {row, source, size, placement, colour} of ready) {
+        const key = size.w + 'x' + size.h;
+        status.textContent = 'Staging ' + size.label + '…';
+        try {
+          const exact = source.w === size.w && source.h === size.h;
+          if (!exact && ((!settings.up && placement.s > 1.001) || (!settings.down && placement.s < .999) ||
+              (!settings.float && placement.mode === 'contain'))) throw new Error('supply an exact-size file for this placement');
+          let blob = source.file;
+          let name = source.name;
+          if (!exact) {
+            if (size.w * size.h > 30_000_000) throw new Error('supply an exact-size file for this large canvas');
+            const canvas = document.createElement('canvas');
+            canvas.width = size.w;
+            canvas.height = size.h;
+            drawPlaced(canvas.getContext('2d'), source, row, size, 1, size.w, size.h, placement, colour);
+            blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+            canvas.width = canvas.height = 0;
+            if (!blob) throw new Error('the preview could not be rendered');
+            name = key + '.png';
+          }
+          await request('/artwork/' + key, {method: 'POST', body: blob, headers: {
+            'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(name), 'X-Adapt-Initial-Artwork': '1',
+          }});
+          added++;
+        } catch (error) { skipped.push(size.label + ' – ' + error.message); }
+      }
+      status.textContent = added + ' new size' + (added === 1 ? '' : 's') + ' staged. Existing artwork stays in the queue.' +
+        (skipped.length ? ' Needs attention: ' + skipped.join(' · ') : '');
+    } catch (error) { status.textContent = error.message; }
+    finally { controls.forEach((control) => {control.disabled = false;}); }
+  }
+  $('openApprovals').onclick = () => prepareApprovals(false);
+  $('stageApprovals').onclick = () => prepareApprovals(true);
   // redraw one file's previews in place, so a colour picker stays open while you drag
   function redrawFile(label){const r=specRows.find(x=>x.F.label===label),a=artMap.get(label);if(!r||!a)return;
     $('artList').querySelectorAll('canvas[data-f]').forEach(cv=>{if(cv.dataset.f!==label)return;const z=r.fm.find(x=>x.z.label===cv.dataset.z);

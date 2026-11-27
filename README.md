@@ -11,6 +11,19 @@ physical-size DPI equivalents and anomalies before the user chooses which digita
 import. Named plans can be saved to the application database and shared through unlisted
 view links; the creating browser keeps a separate edit key.
 
+## Artwork approvals
+
+Save a named plan, then open **Artwork supplied → Open approval queue**. Supply one
+exact-size PNG, JPEG or WebP per size, or use **Stage supplied sizes** to provision
+missing sizes using the planner's current artwork and scaling rules. The flight
+check lists selected versions and omissions, so a queue can be submitted in batches.
+
+Creating a round makes a review link and prepares an email draft for the artworker
+to send. The link allows whoever receives it to see and review only that round's
+artwork for 30 days. The artworker can revoke it from the queue. A reviewer can
+approve each creative or request amends with canvas markup. Revisions are uploaded
+as new versions, with the previous artwork and decisions still available in history.
+
 | Path | What it is |
 | --- | --- |
 | `src/aspect-ratios.html` | The whole app: one self-contained HTML file (markup, CSS, JavaScript). No build step. |
