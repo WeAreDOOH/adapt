@@ -101,6 +101,7 @@ function renderWorkspace() {
   thumbnailQueue.length = 0;
   const formats = workspace.formats;
   const supplied = formats.filter((f) => f.versions.length).length;
+  $("tryDrawing").disabled = !supplied;
   const amends = formats.filter((f) => f.versions[0]?.status === "changes").length;
   $("coverage").textContent = `${supplied} of ${formats.length} sizes supplied · ${selected.size} selected · ${amends} awaiting amends`;
   $("flight").disabled = !selected.size;
@@ -476,7 +477,7 @@ root.querySelectorAll("[data-filter]").forEach((control) => {
   };
 });
 
-function openOwnerVersion(row, version) {
+function openOwnerVersion(row, version, openMarkup = false) {
   perform(async () => {
     const record = await (await api(ownerPath + "/versions/" + version.id)).json();
     const latestDecision = record.entries.find((entry) => entry.decision);
@@ -489,8 +490,14 @@ function openOwnerVersion(row, version) {
     $("history").hidden = false;
     $("backWorkspace").hidden = false;
     await display({ ...record, decision: latestDecision?.decision, feedback: latestDecision?.feedback }, ownerPath + "/versions/" + version.id + "/image");
+    if (openMarkup) setMarkupOpen(true);
   });
 }
+$("tryDrawing").onclick = () => {
+  if (!workspace?.practice) return;
+  const sample = workspace.formats.find((format) => format.versions.length);
+  if (sample) openOwnerVersion(sample, sample.versions[0], true);
+};
 
 async function openClientPosition(index) {
   if (!review || index < 0 || index >= review.items.length || busy) return;
@@ -522,27 +529,33 @@ async function display(item, imagePath) {
   gesture = null;
   temporaryGuides = [];
   $("annotationPins").replaceChildren();
-  feedback = item.feedback || drafts.get(item.id) || blankFeedback();
-  if (editable()) drafts.set(item.id, feedback);
+  feedback = practiceDrawing()
+    ? structuredClone(item.feedback || blankFeedback())
+    : item.feedback || drafts.get(item.id) || blankFeedback();
+  if (canReview()) drafts.set(item.id, feedback);
   setNotice("status", "");
   setNotice("decisionError", "");
   $("workspace").hidden = true;
   $("viewer").hidden = false;
   $("navigation").hidden = !client;
   $("creativeList").hidden = !client;
+  $("viewerMode").textContent = practiceDrawing() ? "Practice drawing"
+    : client ? (item.decision ? "Submitted review" : "Reviewer") : "Artwork preview";
   $("creativeTitle").textContent = `${prettySize(item.size)} px · Version ${item.number}`;
   $("creativeFile").textContent = item.filename;
   $("artworkerNote").hidden = !item.note;
   $("artworkerNoteText").textContent = item.note || "";
   $("downloadVersion").hidden = true;
   $("decisionBadge").replaceChildren(item.decision ? badge(item.decision) : make("span", client ? "Awaiting review" : ""));
-  $("decisionControls").hidden = !editable();
+  $("decisionControls").hidden = !canReview();
   $("changes").disabled = $("approve").disabled = true;
   $("drawingTools").hidden = !editable();
-  $("markupAccess").hidden = editable();
-  if (!editable()) $("markupAccess").textContent = client
+  $("markupAccess").hidden = canReview();
+  $("markupAccess").textContent = practiceDrawing()
+    ? "Draw and attach notes here to try the tools. These marks are temporary. Submit a practice round to test sending feedback."
+    : client
     ? "This decision has been submitted. You can open saved notes and add temporary guides."
-    : "Reviewer drawings and notes appear here after submission. You can open note badges and add temporary guides.";
+    : "You can read submitted notes and add temporary guides here. Drawings and new notes are added in the reviewer view.";
   $("comment").value = feedback.comment;
   $("viewport").scrollTo(0, 0);
   setTool(editable() && !$("markupPanel").hidden ? "pen" : "pan");
@@ -567,10 +580,12 @@ async function display(item, imagePath) {
   await $("artwork").decode().catch(() => {
     if (ticket === generation) throw new Error("Adapt could not display this artwork image.");
   });
-  if (ticket === generation) $("changes").disabled = $("approve").disabled = !editable();
+  if (ticket === generation) $("changes").disabled = $("approve").disabled = !canReview();
 }
 
-function editable() { return client && current && !current.decision; }
+function practiceDrawing() { return !client && workspace?.practice === true; }
+function canReview() { return client && !!current && !current.decision; }
+function editable() { return canReview() || practiceDrawing(); }
 function movableGuides() { return editable() ? feedback.guides : temporaryGuides; }
 function changeGuides(change) {
   recordUndo();
@@ -613,10 +628,10 @@ $("backWorkspace").onclick = () => {
 };
 $("previous").onclick = () => openClientPosition(position - 1);
 $("next").onclick = () => openClientPosition(position + 1);
-$("comment").oninput = () => { if (editable()) feedback.comment = $("comment").value; };
+$("comment").oninput = () => { if (canReview()) feedback.comment = $("comment").value; };
 
 function decide(decision, control) {
-  if (!editable() || busy) return;
+  if (!canReview() || busy) return;
   const item = current;
   $("changes").disabled = $("approve").disabled = true;
   const payload = structuredClone(feedback);
@@ -687,8 +702,7 @@ $("rulers").onclick = () => { toggle("rulers"); resize(); };
 $("grid").onclick = () => { toggle("grid"); draw(); };
 $("safe").onclick = () => { $("safeFrame").hidden = !toggle("safe"); };
 $("overlayToggle").onclick = () => { toggle("overlayToggle"); draw(); };
-$("markupTools").onclick = () => {
-  const expanded = $("markupPanel").hidden;
+function setMarkupOpen(expanded) {
   $("markupTools").setAttribute("aria-expanded", expanded);
   $("markupPanel").hidden = !expanded;
   if (expanded) {
@@ -697,7 +711,8 @@ $("markupTools").onclick = () => {
     if (editable() && tool === "pan") setTool("pen");
     resize();
   } else setTool("pan");
-};
+}
+$("markupTools").onclick = () => setMarkupOpen($("markupPanel").hidden);
 function addGuide(axis) {
   if (!feedback || movableGuides().length >= 50) return;
   $("rulers").setAttribute("aria-pressed", "true");
@@ -1079,7 +1094,7 @@ function focusMark(point) {
 function renderFeedback() {
   const list = $("feedbackList");
   list.replaceChildren();
-  if (!editable() && feedback.comment) list.append(make("p", feedback.comment, "mark"));
+  if (!canReview() && feedback.comment) list.append(make("p", feedback.comment, "mark"));
   for (const [kind, marks] of [["notes", feedback.notes], ["strokes", feedback.strokes], ["guides", feedback.guides]]) {
     marks.forEach((mark, i) => {
       const row = make("div", "", "mark");

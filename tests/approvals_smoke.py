@@ -279,6 +279,25 @@ with sync_playwright() as driver:
     assert practice.locator(".stats").is_hidden() and practice.locator("#startPractice").is_hidden()
     assert practice.locator("#exitPractice").is_visible()
     assert planner.locator("#input").input_value() == draft_sizes
+    practice.locator("#tryDrawing").click()
+    practice.locator("#viewerMode").get_by_text("Practice drawing", exact=True).wait_for()
+    assert practice.get_by_role("button", name="Pen", exact=True).is_visible()
+    assert practice.locator("#decisionControls").is_hidden()
+    assert "These marks are temporary." in practice.locator("#markupAccess").inner_text()
+    drawing_box = practice.locator("#stage").bounding_box()
+    practice.mouse.move(drawing_box["x"] + 80, drawing_box["y"] + 80)
+    practice.mouse.down()
+    practice.mouse.move(drawing_box["x"] + 145, drawing_box["y"] + 110, steps=8)
+    practice.mouse.up()
+    practice.get_by_role("button", name="Add note to Pen stroke 1", exact=True).click()
+    practice.locator("#noteText").fill("Temporary practice mark.")
+    practice.locator("#saveNote").click()
+    practice.locator("#feedbackList").get_by_text("Temporary practice mark.", exact=True).wait_for()
+    practice.locator("#backWorkspace").click()
+    practice.get_by_role("button", name="View artwork", exact=True).first.click()
+    practice.locator("#viewerMode").wait_for()
+    assert practice.locator("[data-stroke-kind]").count() == 0
+    practice.locator("#backWorkspace").click()
     practice.locator("#flight").click()
     for name in ["checkSpec", "checkLayout", "checkScope"]:
         practice.locator("#" + name).check()
@@ -305,6 +324,7 @@ with sync_playwright() as driver:
         practice.locator("#tryReviewer").click()
     practice_reviewer = opened.value
     practice_reviewer.get_by_text("Practice reviewer", exact=True).wait_for()
+    assert practice_reviewer.locator("[data-stroke-kind]").count() == 0
     practice_reviewer.locator("#markupTools").click()
     practice_reviewer.get_by_role("button", name="Pin note").wait_for()
     practice_reviewer.locator("#comment").fill("Move the headline up.")

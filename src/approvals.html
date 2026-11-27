@@ -18,7 +18,12 @@
       <p id="status" class="notice" role="status" hidden></p>
     </header>
     <section id="workspace" hidden>
-      <div id="practiceGuide" class="notice" hidden><strong>Practice workspace</strong><p>These are sample creatives. Add a note, then select <strong>Submit for review</strong>. After the flight check, <strong>Try as reviewer</strong> opens the review in a new tab. To return to your normal planner, choose <strong>Exit practice</strong>.</p></div>
+      <div id="practiceGuide" class="notice" hidden>
+        <div class="section-head">
+          <div><strong>Practice workspace</strong><p>Try drawing on a sample, or use <strong>Submit for review</strong> to practise sending feedback back to Creative.</p></div>
+          <button type="button" class="primary" id="tryDrawing">Try drawing</button>
+        </div>
+      </div>
       <div class="section-head"><div><h2>Saved artwork</h2><p id="coverage"></p></div><div class="actions"><button id="membersOpen" hidden>People &amp; roles</button><button id="refresh">Refresh</button><button class="primary" id="flight">Submit for review</button></div></div>
       <div id="deliveryDrop" class="delivery-drop">
         <div><strong>Drop delivery artwork here</strong><p>PNG, JPEG or WebP · up to 20 MB each. Files that match a plan size are saved as supplied.</p></div>
@@ -42,7 +47,7 @@
         <strong id="position"></strong><span id="decisions"></span>
       </div>
       <nav id="creativeList" class="creative-list" aria-label="Submitted artwork"></nav>
-      <div class="section-head viewer-title"><div><h2 id="creativeTitle"></h2><p id="creativeFile"></p></div><div class="actions"><a class="button" id="downloadVersion" hidden>Download image</a><button id="backWorkspace" hidden>Back to Creative</button></div></div>
+      <div class="section-head viewer-title"><div><p id="viewerMode" class="eyebrow"></p><h2 id="creativeTitle"></h2><p id="creativeFile"></p></div><div class="actions"><a class="button" id="downloadVersion" hidden>Download image</a><button id="backWorkspace" hidden>Back to Creative</button></div></div>
       <div class="review-layout">
         <section id="board" class="board" aria-label="Artwork viewer">
           <div class="toolbar" aria-label="View tools">
