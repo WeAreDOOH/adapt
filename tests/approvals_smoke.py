@@ -53,8 +53,36 @@ with sync_playwright() as driver:
     plan_id = owner.url.split("saved=")[1].split("&")[0]
     assert client.request.get(base + "/api/approvals/plans/" + plan_id).status == 403
     assert client.request.get(base + "/api/approvals/review").status == 404
-    owner.locator("#queue .card").filter(has_text="360 × 640").locator("input[type=file]").set_input_files(
-        {"name": "portrait.png", "mimeType": "image/png", "buffer": png(360, 640, (40, 180, 90))})
+    roles = owner.locator("#membersDialog")
+    owner.locator("#membersOpen").click()
+    owner.locator("#memberEmail").fill("artist@example.test")
+    owner.locator("#addMember").click()
+    owner.locator("#memberLink").wait_for()
+    artist_url = owner.locator("#memberLink").input_value()
+    owner.locator("#memberEmail").fill("client@example.test")
+    owner.locator("#memberRole").select_option("reviewer")
+    owner.locator("#addMember").click()
+    roles.get_by_text("client@example.test", exact=True).wait_for()
+    roles.get_by_role("button", name="Done").click()
+    artist = browser.new_page()
+    artist.goto(artist_url)
+    artist.get_by_text("1 of 2 sizes supplied", exact=False).wait_for()
+    assert artist.locator("#membersOpen").is_hidden()
+    artist_key = artist_url.split("#access=")[1]
+    artist_headers = {"X-Adapt-Workspace-Key": artist_key}
+    path = base + "/api/approvals/plans/" + plan_id
+    assert artist.request.get(path + "/members", headers=artist_headers).status == 403
+    assert artist.request.put(path + "/formats", headers=artist_headers, data={"formats": []}).status == 403
+    artist.get_by_role("button", name="Add note").click()
+    artist.locator("#creativeNoteInput").fill("Please check the revised legal line.")
+    artist.locator("#saveCreativeNote").click()
+    artist.get_by_text("Note: Please check the revised legal line.", exact=True).wait_for()
+    portrait = owner.evaluate_handle("""bytes => {
+        const data = new DataTransfer();
+        data.items.add(new File([new Uint8Array(bytes)], 'portrait.png', { type: 'image/png' }));
+        return data;
+    }""", list(png(360, 640, (40, 180, 90))))
+    owner.locator("#queue .card").filter(has_text="360 × 640").dispatch_event("drop", {"dataTransfer": portrait})
     owner.get_by_text("2 of 2 sizes supplied", exact=False).wait_for()
     owner.get_by_role("checkbox", name="Include 360 × 640 in next review").uncheck()
 
@@ -75,7 +103,8 @@ with sync_playwright() as driver:
     client.locator("#changes").wait_for()
     assert client.locator("#creativeList button").count() == 1
     assert client.locator("#creativeTitle").inner_text() == "640 × 360 px · Version 1"
-    assert client.locator("#role").inner_text() == "Client reviewer"
+    assert client.locator("#role").inner_text() == "Reviewer"
+    client.get_by_text("Please check the revised legal line.", exact=True).wait_for()
     assert client.locator("#back").is_hidden()
     client.wait_for_function("document.querySelector('#artwork').naturalWidth === 640")
     client.locator("#rulers").click()
@@ -132,6 +161,36 @@ with sync_playwright() as driver:
     owner.get_by_text("Round 1 · Revoked", exact=True).wait_for()
     client.reload()
     client.get_by_text("Review unavailable", exact=True).wait_for()
+    owner.locator("#membersOpen").click()
+    roles.locator(".card").filter(has_text="artist@example.test").get_by_role("button", name="Revoke access").click()
+    roles.get_by_text("Artworker · Access revoked", exact=True).wait_for()
+    assert artist.request.get(path, headers=artist_headers).status == 403
+    roles.locator(".card").filter(has_text="client@example.test").get_by_role("button", name="Revoke access").click()
+    roles.get_by_text("Reviewer · Access revoked", exact=True).wait_for()
+    client.goto(next_link)
+    client.get_by_text("Review unavailable", exact=True).wait_for()
+    roles.get_by_role("button", name="Done").click()
+
+    owner.goto(base + "/?view=creative")
+    owner.locator("#startPractice").click()
+    owner.get_by_text("2 of 2 sizes supplied", exact=False).wait_for()
+    owner.locator("#flight").click()
+    for name in ["checkSpec", "checkLayout", "checkScope"]:
+        owner.locator("#" + name).check()
+    assert owner.locator("#recipient").is_hidden()
+    owner.locator("#submitRound").click()
+    owner.locator("#tryReviewer").wait_for()
+    assert owner.locator("#emailInvite").is_hidden()
+    with owner.context.expect_page() as opened:
+        owner.locator("#tryReviewer").click()
+    practice_reviewer = opened.value
+    practice_reviewer.get_by_text("Practice reviewer", exact=True).wait_for()
+    practice_reviewer.locator("#comment").fill("Move the headline up.")
+    practice_reviewer.locator("#changes").click()
+    practice_reviewer.get_by_text("Decision saved.", exact=True).wait_for()
+    owner.locator("#inviteDialog").get_by_role("button", name="Done").click()
+    owner.locator("#refresh").click()
+    owner.get_by_role("button", name="Open amendments").wait_for()
     assert not errors, errors
     browser.close()
-    print("PASS Creative: saved upload, reload, exact download, scoped review, guides, markup, revisions and revocation")
+    print("PASS Creative: saved artwork, notes, scoped roles, markup, versions, revocation and practice walkthrough")

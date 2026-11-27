@@ -45,6 +45,13 @@ button:disabled { opacity: .48; cursor: default; }
 .filters, .creative-list { margin: 14px 0; }
 .delivery-drop { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; border: 1px dashed var(--line); border-radius: 8px; padding: 14px; margin-top: 12px; }
 .delivery-drop.dragging { border-color: var(--accent); background: var(--raised); }
+.card.drop-ready { border-style: dashed; }
+.card.dragging { border-color: var(--accent); background: var(--raised); }
+.drop-cue { color: var(--muted); font-size: .86rem; }
+#practiceGuide, #artworkerNote { margin: 0 0 14px; }
+#artworkerNoteText { white-space: pre-wrap; overflow-wrap: anywhere; }
+#memberList { margin-top: 12px; max-height: 245px; overflow: auto; }
+#memberLinkBox { border-top: 1px solid var(--line); margin-top: 14px; }
 .delivery-drop p { font-size: .88rem; }
 .thumb { flex: 0 0 100px; height: 64px; max-width: 100%; padding: 0; background: var(--bg); }
 .thumb canvas { width: 100%; height: 100%; object-fit: contain; display: block; }

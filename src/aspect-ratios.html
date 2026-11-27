@@ -734,7 +734,8 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
 
     <section class="panel results" aria-label="Results">
       <div id="paneArt" role="tabpanel" aria-labelledby="cardArt" hidden>
-        <div class="pane-head"><h2 class="pane-title">Creative</h2></div>
+        <div class="pane-head"><h2 class="pane-title">Creative</h2><button type="button" id="startPractice">Start a practice review</button></div>
+        <p id="practiceStatus" class="help" role="status" hidden></p>
         <div class="creative-gate" id="creativeGate">
           <p class="help" id="creativeGateText" role="status">Save a plan to upload and keep its artwork.</p>
           <div class="openrow" id="creativeSaveRow"><input id="creativePlanName" maxlength="120" placeholder="Campaign or project name" aria-label="Creative plan name"><button type="button" class="primary" id="creativeSave">Save plan</button></div>
@@ -1599,15 +1600,15 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   $('planIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('planOpen').click();});
 
   // ---------- named plans: unlisted view links, browser-held edit keys ----------
-  let currentSavedId='', savedPlanSizes='';
+  let currentSavedId='', savedPlanSizes='', practicePlan=false;
   const ownedPlans=()=>{try{const v=JSON.parse(localStorage.getItem('adapt-owned-plans')||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
   const savedLink=id=>location.origin+location.pathname+'?saved='+encodeURIComponent(id);
-  function rememberOwned(plan){const rows=ownedPlans().filter(x=>x.id!==plan.id);rows.unshift({id:plan.id,name:plan.name,editKey:plan.editKey||'',updatedAt:plan.updatedAt});try{localStorage.setItem('adapt-owned-plans',JSON.stringify(rows.slice(0,30)))}catch(e){}renderOwnedPlans();}
+  function rememberOwned(plan){const rows=ownedPlans().filter(x=>x.id!==plan.id);rows.unshift({id:plan.id,name:plan.name,editKey:plan.editKey||'',updatedAt:plan.updatedAt});try{localStorage.setItem('adapt-owned-plans',JSON.stringify(rows))}catch(e){}renderOwnedPlans();}
   function renderOwnedPlans(){const rows=ownedPlans();$('savedList').innerHTML=rows.length?rows.map(x=>'<div class="saveditem"><span class="savedname" title="'+esc(x.name)+'">'+esc(x.name)+'</span><button type="button" data-open-saved="'+esc(x.id)+'">Open</button><button type="button" data-share-saved="'+esc(x.id)+'">Share</button></div>').join(''):'<span class="hint">No named plans saved in this browser yet.</span>';}
   async function openSavedPlan(id,fromLink){
     try{const r=await fetch('/api/plans/'+encodeURIComponent(id),{headers:{Accept:'application/json'}}),data=await r.json();if(!r.ok)throw new Error(data.error||'Plan not found');
       if(currentSavedId!==data.id)resetCreativeProject();
-      applyState(data.plan);currentSavedId=data.id;savedPlanSizes=data.plan.sizes;$('planName').value=data.name;$('saveBox').open=true;$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
+      applyState(data.plan);currentSavedId=data.id;savedPlanSizes=data.plan.sizes;practicePlan=data.plan.practice===true;$('planName').value=data.name;$('saveBox').open=true;$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
       const creative=new URLSearchParams(location.search).get('view')==='creative'||!$('paneArt').hidden;
       history.replaceState(null,'',savedLink(data.id)+(creative?'&view=creative':''));
       $('restored').hidden=true;$('sharedNote').hidden=!!creativeOwner();renderGrid();render();if(creative)showTab('art');toast(fromLink?'Opened the saved plan':'Plan opened');return true;
@@ -1615,8 +1616,8 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   async function saveCurrentPlan(name){
     const owned=ownedPlans().find(x=>x.id===currentSavedId&&x.editKey),updating=!!owned;
     const btn=$('savePlan');btn.disabled=true;$('savedStatus').textContent=updating?'Updating…':'Saving…';
-    try{const r=await fetch(updating?'/api/plans/'+currentSavedId:'/api/plans',{method:updating?'PUT':'POST',headers:{'Content-Type':'application/json',...(updating?{'X-Adapt-Plan-Key':owned.editKey}:{})},body:JSON.stringify({name,plan:getState()})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Plan could not be saved');
-      currentSavedId=data.id;savedPlanSizes=data.plan.sizes;$('planName').value=data.name;rememberOwned({...data,editKey:data.editKey||owned?.editKey});$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
+    try{const r=await fetch(updating?'/api/plans/'+currentSavedId:'/api/plans',{method:updating?'PUT':'POST',headers:{'Content-Type':'application/json',...(updating?{'X-Adapt-Plan-Key':owned.editKey}:{})},body:JSON.stringify({name,plan:{...getState(),...(practicePlan&&updating?{practice:true}:{})}})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Plan could not be saved');
+      currentSavedId=data.id;savedPlanSizes=data.plan.sizes;practicePlan=data.plan.practice===true;$('planName').value=data.name;rememberOwned({...data,editKey:data.editKey||owned?.editKey});$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
       const creative=!$('paneArt').hidden;history.replaceState(null,'',savedLink(data.id)+(creative?'&view=creative':''));
       if(creative)await syncCreative();toast(updating?'Plan updated':'Plan saved');return true;
     }catch(e){$('savedStatus').textContent=e.message||'Plan could not be saved';toast('Plan not saved');return false;}finally{btn.disabled=false;}}
@@ -2125,6 +2126,51 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   };
   $('creativePlanName').addEventListener('keydown',(event)=>{if(event.key==='Enter')$('creativeSave').click();});
 
+  function practiceImage(width,height){
+    const canvas=document.createElement('canvas');
+    canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d');
+    const gradient=ctx.createLinearGradient(0,0,width,height);
+    gradient.addColorStop(0,'#151d3c');gradient.addColorStop(1,'#3b2268');
+    ctx.fillStyle=gradient;ctx.fillRect(0,0,width,height);
+    ctx.fillStyle='#77e1c7';
+    ctx.beginPath();ctx.arc(width*.83,height*.25,Math.min(width,height)*.23,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#f6faff';
+    const textSize=Math.round(Math.min(width,height)*.125);
+    ctx.font='bold '+textSize+'px system-ui';
+    ctx.fillText('After Hours',width*.08,height*.60,width*.84);
+    ctx.font=Math.round(textSize*.38)+'px system-ui';
+    ctx.fillText('A CREATIVE REVIEW SAMPLE',width*.08,height*.72,width*.84);
+    return new Promise((resolve,reject)=>canvas.toBlob((blob)=>blob?resolve(blob):reject(new Error('Could not render sample artwork.')),'image/png'));
+  }
+  $('startPractice').onclick=async()=>{
+    const control=$('startPractice'),message=$('practiceStatus');
+    const formats=[{width:640,height:360},{width:320,height:480}];
+    let saved;
+    control.disabled=true;message.hidden=false;message.textContent='Preparing sample artwork…';
+    try{
+      const plan={v:1,sizes:formats.map(({width,height})=>width+'x'+height).join('\n'),art:'',o:{allowDown:1},practice:true};
+      const response=await fetch('/api/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Practice · After Hours',plan})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||'Could not create the practice plan.');
+      saved=data;rememberOwned(saved);
+      await creativeRequest(saved,'/formats',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formats})});
+      for(const {width,height} of formats){
+        const size=width+'x'+height;
+        await creativeRequest(saved,'/artwork/'+size,{method:'POST',body:await practiceImage(width,height),headers:{
+          'Content-Type':'application/octet-stream','X-File-Name':'practice-'+size+'.png','X-Adapt-Initial-Artwork':'1',
+        }});
+      }
+      location.assign(savedLink(saved.id)+'&view=creative');
+    }catch(error){
+      message.textContent=error.message;
+      if(saved){
+        const link=document.createElement('a');link.href=savedLink(saved.id)+'&view=creative';link.textContent='Open the practice plan';
+        message.append(' ',link);
+      }
+    }finally{control.disabled=false;}
+  };
+
   // Save derived delivery images with the same placement rules used by the previews.
   async function saveGeneratedSizes() {
     const owns = ownedPlans().find((entry) => entry.id === currentSavedId && entry.editKey);
@@ -2362,6 +2408,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   $('useExample').onclick=()=>{$('example').click();};
   input.addEventListener('input',()=>{$('restored').hidden=true;$('sharedNote').hidden=true;if(!$('paneArt').hidden&&location.protocol!=='file:')updateCreativeGate();});
   render();
+  if(!savedCode&&new URLSearchParams(location.search).get('view')==='creative')showTab('art');
 })();
 </script>
 <script src="/msal-browser.min.js?v=5.29.0"></script>

@@ -15,7 +15,7 @@ const markedVersions = new Set();
 let workspace, review, current, feedback, pendingNote, gesture, imageUrl, generation = 0, navigationRequest = 0;
 let position = 0, filter = "all", tool = "pan", zoom = 1, fit = true, busy = false;
 let reviewKey = "";
-let ownerKey = "";
+let ownerKey = "", workspaceKey = "", editingVersion = "";
 const appKey = "adapt-review-key";
 
 function make(tag, content, className) {
@@ -42,7 +42,8 @@ function badge(status) { return make("span", statusNames[status], "badge " + sta
 const ownerPath = "/api/approvals/plans/" + encodeURIComponent(planId ?? "");
 const reviewPath = "/api/approvals/review";
 async function api(url, options = {}) {
-  const access = client ? { "X-Adapt-Review-Key": reviewKey } : { "X-Adapt-Plan-Key": ownerKey };
+  const access = client ? { "X-Adapt-Review-Key": reviewKey }
+    : workspaceKey ? { "X-Adapt-Workspace-Key": workspaceKey } : { "X-Adapt-Plan-Key": ownerKey };
   const response = await fetch(url, { signal: lifetime.signal, ...options, headers: { ...access, ...options.headers } });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -69,6 +70,8 @@ async function perform(action, control, errorId = "status") {
 async function loadWorkspace() {
   workspace = await (await api(ownerPath)).json();
   $("title").textContent = workspace.title;
+  $("membersOpen").hidden = !workspace.owner || workspace.practice;
+  $("practiceGuide").hidden = !workspace.practice;
   $("intro").textContent = "Supply one file per size, submit a review round and pick up amendments here.";
   const ready = new Set(workspace.formats.map((f) => f.versions[0]).filter((v) => v?.status === "draft").map((v) => v.id));
   for (const key of selected) if (!ready.has(key)) selected.delete(key);
@@ -90,7 +93,7 @@ function renderWorkspace() {
   $("flight").disabled = !selected.size;
   const rows = formats.filter((f) => filter === "all" || f.versions[0]?.status === filter);
   $("queue").replaceChildren(...rows.map((row) => formatCard(row, false)));
-  if (!rows.length) $("queue").append(make("p", formats.length ? "No artwork in this queue." : "Open Artwork supplied in the planner to add sizes."));
+  if (!rows.length) $("queue").append(make("p", formats.length ? "No artwork in this queue." : "Add sizes to the plan to start Creative."));
   $("archived").hidden = !workspace.archived.length;
   $("archiveList").replaceChildren(...workspace.archived.map((row) => formatCard(row, true)));
   $("rounds").replaceChildren(...workspace.rounds.map(roundCard));
@@ -103,6 +106,7 @@ function formatCard(row, archived) {
   const identity = make("div");
   identity.append(make("h3", prettySize(row.size) + " px"), badge(version?.status || "empty"));
   if (version) identity.append(make("p", `Version ${version.number} · ${version.filename}`));
+  if (version?.note) identity.append(make("p", "Note: " + version.note));
   card.append(identity);
   if (version) card.append(thumbnail(row, version));
   if (version?.status === "draft" && !archived) {
@@ -121,23 +125,51 @@ function formatCard(row, archived) {
     card.append(label);
   }
   if (!archived && version?.status !== "in_review") {
+    card.classList.add("drop-ready");
+    if (!version) identity.append(make("p", "Drop artwork into this box", "drop-cue"));
     const upload = make("input");
     upload.type = "file";
     upload.accept = "image/png,image/jpeg,image/webp";
     upload.hidden = true;
     const uploadButton = button(version ? "Upload new version" : "Upload artwork", () => upload.click());
-    upload.onchange = () => {
-      const file = upload.files[0];
+    const saveFile = (file) => {
       if (!file) return;
       perform(async () => {
         await uploadArtwork(row.size, file);
         await loadWorkspace();
         setNotice("status", `Artwork saved for ${prettySize(row.size)}.`);
       }, uploadButton);
+    };
+    upload.onchange = () => {
+      saveFile(upload.files[0]);
       upload.value = "";
+    };
+    card.ondragover = (event) => {
+      if (!event.dataTransfer.types.includes("Files")) return;
+      event.preventDefault();
+      card.classList.add("dragging");
+    };
+    card.ondragleave = (event) => {
+      if (!card.contains(event.relatedTarget)) card.classList.remove("dragging");
+    };
+    card.ondrop = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      card.classList.remove("dragging");
+      if (event.dataTransfer.files.length > 1) {
+        setNotice("status", "Drop one file into a size box, or use the delivery area for multiple files.", true);
+        return;
+      }
+      saveFile(event.dataTransfer.files[0]);
     };
     card.append(uploadButton, upload);
   }
+  if (version?.status === "draft" && !archived) card.append(button(version.note ? "Edit note" : "Add note", () => {
+    editingVersion = version.id;
+    $("creativeNoteInput").value = version.note || "";
+    setNotice("creativeNoteError", "");
+    $("creativeNoteDialog").showModal();
+  }));
   if (version) {
     card.append(button(version.status === "changes" ? "Open amendments" : "View artwork", () => openOwnerVersion(row, version)));
     const history = make("details", "", "version-list");
@@ -153,6 +185,15 @@ function formatCard(row, archived) {
   }
   return card;
 }
+
+$("creativeNoteForm").onsubmit = (event) => {
+  event.preventDefault();
+  perform(async () => {
+    await post(ownerPath + "/versions/" + editingVersion + "/note", { note: $("creativeNoteInput").value }, "PUT");
+    $("creativeNoteDialog").close();
+    await loadWorkspace();
+  }, $("saveCreativeNote"), "creativeNoteError");
+};
 
 async function uploadArtwork(size, file) {
   const dimensions = await readDimensions(file);
@@ -216,8 +257,17 @@ $("deliveryDrop").ondragleave = (event) => {
 };
 $("deliveryDrop").ondrop = (event) => {
   event.preventDefault();
+  event.stopPropagation();
   $("deliveryDrop").classList.remove("dragging");
   addDeliveries([...event.dataTransfer.files]);
+};
+$("workspace").ondragover = (event) => {
+  if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+};
+$("workspace").ondrop = (event) => {
+  if (!event.dataTransfer.files.length) return;
+  event.preventDefault();
+  setNotice("status", "Drop artwork into an editable size box or the delivery upload area.", true);
 };
 
 const thumbnailQueue = [];
@@ -274,8 +324,14 @@ function roundCard(round) {
   card.append(label);
   if (!closed) {
     const link = getInvite(round.id);
-    if (link) card.append(button("Review link", () => showInvite(link, round)));
-    card.append(button("Revoke link", () => {
+    if (link && workspace.practice) {
+      const action = make("a", "Try as reviewer", "button");
+      action.href = link;
+      action.target = "_blank";
+      action.rel = "noopener";
+      card.append(action);
+    } else if (link) card.append(button("Review link", () => showInvite(link, round)));
+    if (workspace.owner) card.append(button("Revoke link", () => {
       if (!confirm("Revoke this link? Unreviewed artwork returns to the submission queue.")) return;
       perform(async () => { await api(ownerPath + "/rounds/" + round.id, { method: "DELETE" }); await loadWorkspace(); });
     }));
@@ -292,6 +348,10 @@ function showInvite(link, round) {
   const message = round.message ? round.message + "\n\n" : "";
   const body = `Hello,\n\nPlease review the artwork for ${workspace.title}.\n\n${message}${link}\n\nYou can approve each size or mark up any changes in Adapt. Thank you.`;
   $("emailInvite").href = "mailto:" + encodeURIComponent(round.recipient) + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
+  $("emailInvite").hidden = workspace.practice;
+  $("tryReviewer").hidden = !workspace.practice;
+  $("tryReviewer").href = link;
+  if (workspace.practice) $("inviteInfo").textContent = "Open the same view a reviewer would use. Your decisions will appear back on this practice plan.";
   $("copyInvite").textContent = "Copy link";
   $("inviteDialog").showModal();
 }
@@ -301,7 +361,16 @@ $("flight").onclick = () => {
   const omitted = workspace.formats.length - list.length;
   $("flightForm").reset();
   setNotice("flightError", "");
-  $("recipient").value = workspace.rounds[0]?.recipient || "";
+  const reviewerOptions = workspace.reviewers.map(({ email }) => email);
+  $("reviewerOptions").replaceChildren(...reviewerOptions.map((email) => {
+    const option = make("option");
+    option.value = email;
+    return option;
+  }));
+  $("recipientField").hidden = workspace.practice;
+  $("recipient").required = !workspace.practice;
+  $("practiceRecipient").hidden = !workspace.practice;
+  $("recipient").value = workspace.practice ? "" : (workspace.rounds[0]?.recipient || reviewerOptions[0] || "");
   $("flightSummary").textContent = `${list.length} size${list.length === 1 ? "" : "s"} in this round. ${omitted} outside this round, including sizes that are missing, unselected or already reviewed.`;
   $("flightList").replaceChildren(...list.map((f) => make("li", `${prettySize(f.size)} px · v${f.versions[0].number} · ${f.versions[0].filename}`)));
   $("flightDialog").showModal();
@@ -330,6 +399,60 @@ $("copyInvite").onclick = async () => {
   } catch { $("copyInvite").textContent = "Link selected"; }
 };
 $("refresh").onclick = () => perform(loadWorkspace, $("refresh"));
+
+async function refreshMembers() {
+  const { members } = await (await api(ownerPath + "/members")).json();
+  $("memberList").replaceChildren(...members.map((member) => {
+    const row = make("div", "", "card");
+    const label = make("div");
+    label.append(make("strong", member.email), make("p", (member.role === "artworker" ? "Artworker" : "Reviewer") + (member.revoked ? " · Access revoked" : " · Active")));
+    row.append(label);
+    if (!member.revoked) row.append(button("Revoke access", () => {
+      if (!confirm("Revoke " + member.email + "’s " + member.role + " access?")) return;
+      perform(async () => {
+        await api(ownerPath + "/members/" + member.id, { method: "DELETE" });
+        $("memberLinkBox").hidden = true;
+        await refreshMembers();
+        await loadWorkspace();
+      }, null, "memberError");
+    }));
+    return row;
+  }));
+  if (!members.length) $("memberList").append(make("p", "No people added yet. You have project owner access."));
+}
+$("membersOpen").onclick = () => perform(async () => {
+  $("memberLinkBox").hidden = true;
+  setNotice("memberError", "");
+  await refreshMembers();
+  $("membersDialog").showModal();
+}, $("membersOpen"));
+$("memberForm").onsubmit = (event) => {
+  event.preventDefault();
+  perform(async () => {
+    const email = $("memberEmail").value.trim();
+    const role = $("memberRole").value;
+    const data = await post(ownerPath + "/members", { email, role });
+    $("memberForm").reset();
+    $("memberLinkBox").hidden = !data.key;
+    if (data.key) {
+      const link = location.origin + "/approvals?plan=" + planId + "#access=" + data.key;
+      $("memberLink").value = link;
+      $("emailMember").href = "mailto:" + encodeURIComponent(email) + "?subject=" +
+        encodeURIComponent("Artworker access · " + workspace.title) + "&body=" +
+        encodeURIComponent("Open Creative for " + workspace.title + ":\n\n" + link);
+      $("copyMember").textContent = "Copy access link";
+    }
+    await refreshMembers();
+    await loadWorkspace();
+  }, $("addMember"), "memberError");
+};
+$("copyMember").onclick = async () => {
+  $("memberLink").select();
+  try {
+    await navigator.clipboard.writeText($("memberLink").value);
+    $("copyMember").textContent = "Copied";
+  } catch { $("copyMember").textContent = "Link selected"; }
+};
 root.querySelectorAll("[data-close]").forEach((control) => { control.onclick = () => $(control.dataset.close).close(); });
 root.querySelectorAll("[data-filter]").forEach((control) => {
   control.onclick = () => {
@@ -394,6 +517,8 @@ async function display(item, imagePath) {
   $("creativeList").hidden = !client;
   $("creativeTitle").textContent = `${prettySize(item.size)} px · Version ${item.number}`;
   $("creativeFile").textContent = item.filename;
+  $("artworkerNote").hidden = !item.note;
+  $("artworkerNoteText").textContent = item.note || "";
   $("downloadVersion").hidden = true;
   $("decisionBadge").replaceChildren(item.decision ? badge(item.decision) : make("span", client ? "Awaiting review" : ""));
   $("decisionControls").hidden = !editable();
@@ -759,19 +884,26 @@ function renderFeedback() {
 
 async function initialise() {
   if (client) {
-    $("role").textContent = "Client reviewer";
+    $("role").textContent = "Reviewer";
     return openReview();
   }
   if (!embedded) {
     $("role").textContent = "Artworker";
     $("back").href = planId ? "/?saved=" + encodeURIComponent(planId) + "&view=creative" : "/";
     $("back").hidden = false;
+    const access = new URLSearchParams(location.hash.slice(1)).get("access");
+    try {
+      if (access) sessionStorage.setItem("adapt-artworker-" + planId, access);
+      workspaceKey = access || sessionStorage.getItem("adapt-artworker-" + planId) || "";
+    } catch { workspaceKey = access || ""; }
+    if (access) history.replaceState(null, "", location.pathname + location.search);
+    if (workspaceKey) $("back").hidden = true;
   }
   try {
     ownerKey = JSON.parse(localStorage.getItem("adapt-owned-plans") || "[]")
       .find((p) => p.id === planId)?.editKey || "";
   } catch {}
-  if (!ownerKey) throw new Error("Open Artwork supplied from a saved plan you own to start an approval queue.");
+  if (!ownerKey && !workspaceKey) throw new Error("Open Creative from the plan owner’s browser or use an artworker link.");
   await loadWorkspace();
   $("workspace").hidden = false;
 }
@@ -796,6 +928,12 @@ async function openReview() {
   const result = await (await api(reviewPath)).json();
   if (request !== reviewRequest) return;
   review = result;
+  $("role").textContent = review.practicePlan ? "Practice reviewer" : "Reviewer";
+  $("back").hidden = !review.practicePlan;
+  if (review.practicePlan) {
+    $("back").textContent = "Back to practice Creative";
+    $("back").href = "/?saved=" + review.practicePlan + "&view=creative";
+  }
   $("kicker").textContent = "Artwork approval · Round " + review.number;
   $("title").textContent = review.title;
   $("intro").textContent = review.message || "Review each submitted creative and approve it or request amendments.";

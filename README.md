@@ -18,6 +18,17 @@ files to save originals against their sizes. Reopen Creative to see previews,
 download originals, view markup and find every version. The optional master
 preview tools use the planner's scaling rules to generate and save missing delivery
 sizes. The flight check lists selected versions and omissions for each batch.
+Drop onto a particular size to upload to that box, then add an optional note on
+the draft. Notes accompany the specific version submitted in the round.
+
+**People & roles** lets the plan owner add and revoke artworkers and reviewers.
+Artworkers enter through a project access link and can upload, annotate the
+submission with notes and submit to an active reviewer. They cannot grant access
+or change plan sizes. Reviewers receive a separate, round-specific link.
+
+Use **Creative → Start a practice review** to create a separate plan with sample
+artwork. Submit it, then choose **Try as reviewer** to open the review view in
+another tab. Practice rounds use the same review controls and skip the email draft.
 
 Creating a round makes a review link and prepares an email draft for the artworker
 to send. The link allows whoever receives it to see and review only that round's

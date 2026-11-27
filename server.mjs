@@ -170,19 +170,44 @@ async function handleApprovals(request, response, pathname) {
   const token = request.headers["x-adapt-review-key"];
   if (ownerRoute) {
     const [, plan, action = ""] = ownerRoute;
-    const saved = database.getOwnedPlan(plan, request.headers["x-adapt-plan-key"]);
-    if (!saved) throw new ApprovalError(403, "Open this workspace from the browser that owns the saved plan.");
-    if (!action && method === "GET") return json(response, 200, { title: saved.name, ...approvals.workspace(plan) });
+    const owned = database.getOwnedPlan(plan, request.headers["x-adapt-plan-key"]);
+    const artworker = !owned && approvals.artworker(plan, request.headers["x-adapt-workspace-key"]);
+    const saved = owned || (artworker && database.getPlan(plan));
+    if (!saved) throw new ApprovalError(403, "Open Creative from the plan owner’s browser or use an active artworker link.");
+    const owner = !!owned;
+    const practice = saved.plan.practice === true;
+    const context = { title: saved.name, owner, practice };
+    if (!action && method === "GET") {
+      return json(response, 200, { ...context, reviewers: approvals.members(plan, true), ...approvals.workspace(plan) });
+    }
+    if (action === "/members" || action.startsWith("/members/")) {
+      if (!owner || practice) throw new ApprovalError(403, "Project access can only be managed by its owner.");
+      if (action === "/members" && method === "GET") return json(response, 200, { members: approvals.members(plan) });
+      if (action === "/members" && method === "POST") return json(response, 201, approvals.createMember(plan, await readJson(request)));
+      const member = action.match(/^\/members\/([A-Za-z0-9_-]{16})$/);
+      if (member && method === "DELETE") {
+        approvals.revokeMember(plan, member[1]);
+        return json(response, 200, { ok: true });
+      }
+    }
     if (action === "/formats" && method === "PUT") {
+      if (!owner) throw new ApprovalError(403, "Only the project owner can change its size list.");
       const { formats } = (await readJson(request)) ?? {};
       return json(response, 200, { title: saved.name, ...approvals.setFormats(plan, formats) });
     }
     if (action === "/rounds" && method === "POST") {
-      return json(response, 201, approvals.submit(plan, saved.name, await readJson(request, 30_000)));
+      return json(response, 201, approvals.submit(plan, saved.name, await readJson(request, 30_000), { owner, practice }));
     }
     const revoke = action.match(/^\/rounds\/([A-Za-z0-9_-]{16})$/);
     if (revoke && method === "DELETE") {
+      if (!owner) throw new ApprovalError(403, "Only the project owner can revoke links.");
       approvals.revoke(plan, revoke[1]);
+      return json(response, 200, { ok: true });
+    }
+    const note = action.match(/^\/versions\/([A-Za-z0-9_-]{16})\/note$/);
+    if (note && method === "PUT") {
+      const body = await readJson(request);
+      approvals.saveNote(plan, note[1], body?.note);
       return json(response, 200, { ok: true });
     }
     const upload = action.match(/^\/artwork\/([0-9]{1,5}x[0-9]{1,5})$/);

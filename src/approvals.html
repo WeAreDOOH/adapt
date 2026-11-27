@@ -18,7 +18,8 @@
       <p id="status" class="notice" role="status" hidden></p>
     </header>
     <section id="workspace" hidden>
-      <div class="section-head"><div><h2>Saved artwork</h2><p id="coverage"></p></div><div class="actions"><button id="refresh">Refresh</button><button class="primary" id="flight">Run flight check</button></div></div>
+      <div id="practiceGuide" class="notice" hidden><strong>Practice review</strong><p>Add a note to a sample creative, then select <strong>Submit for review</strong>. After the flight check, <strong>Try as reviewer</strong> opens the review in a new tab. Request amends there, then return here and refresh to pick up the feedback.</p></div>
+      <div class="section-head"><div><h2>Saved artwork</h2><p id="coverage"></p></div><div class="actions"><button id="membersOpen" hidden>People &amp; roles</button><button id="refresh">Refresh</button><button class="primary" id="flight">Submit for review</button></div></div>
       <div id="deliveryDrop" class="delivery-drop">
         <div><strong>Drop delivery artwork here</strong><p>PNG, JPEG or WebP · up to 20 MB each. Files that match a plan size are saved as supplied.</p></div>
         <button id="chooseDelivery" type="button">Choose files</button>
@@ -71,6 +72,7 @@
           <p id="canvasHelp" class="canvas-help" hidden>Drag from a ruler to add a guide. Drag a guide past the edge to remove it. Use Pan to move around zoomed artwork.</p>
         </section>
         <aside class="feedback">
+          <div id="artworkerNote" class="notice" hidden><strong>Note from the artworker</strong><p id="artworkerNoteText"></p></div>
           <div class="section-head"><h2 id="feedbackTitle">Feedback</h2><span id="decisionBadge"></span></div>
           <div id="feedbackList"></div>
           <div id="decisionControls" hidden>
@@ -88,7 +90,8 @@
     <label class="check"><input type="checkbox" id="checkSpec" required> I checked file dimensions and artwork specifications.</label>
     <label class="check"><input type="checkbox" id="checkLayout" required> I checked copy, legibility, safe areas and any cropping.</label>
     <label class="check"><input type="checkbox" id="checkScope" required> I checked the selected sizes and any omissions.</label>
-    <label class="field">Reviewer email<input type="email" id="recipient" required maxlength="254" autocomplete="email"></label>
+    <label class="field" id="recipientField">Reviewer email<input type="email" id="recipient" required maxlength="254" autocomplete="email" list="reviewerOptions"><datalist id="reviewerOptions"></datalist></label>
+    <p id="practiceRecipient" hidden>This round goes to the practice reviewer.</p>
     <label class="field">Message to reviewer<textarea id="message" rows="3" maxlength="2000"></textarea></label>
     <p id="flightError" class="notice error" role="status" hidden></p>
     <div class="actions"><button type="button" data-close="flightDialog">Cancel</button><button class="primary" id="submitRound">Create review link</button></div>
@@ -96,12 +99,33 @@
   <dialog id="inviteDialog" aria-labelledby="inviteTitle">
     <h2 id="inviteTitle">Review link ready</h2>
     <p id="inviteInfo"></p><label class="field">Private review link<input id="inviteLink" readonly></label>
-    <div class="actions"><button type="button" data-close="inviteDialog">Done</button><button id="copyInvite">Copy link</button><a class="button primary" id="emailInvite">Open email draft</a></div>
+    <div class="actions"><button type="button" data-close="inviteDialog">Done</button><button id="copyInvite">Copy link</button><a class="button primary" id="emailInvite">Open email draft</a><a class="button primary" id="tryReviewer" target="_blank" rel="noopener" hidden>Try as reviewer</a></div>
   </dialog>
   <dialog id="noteDialog" aria-labelledby="noteTitle"><form id="noteForm">
     <h2 id="noteTitle">Canvas note</h2><label class="field">Describe the amendment<textarea id="noteText" rows="4" maxlength="1000" required></textarea></label>
     <div class="actions"><button type="button" data-close="noteDialog">Cancel</button><button class="primary">Save note</button></div>
   </form></dialog>
+  <dialog id="creativeNoteDialog" aria-labelledby="creativeNoteTitle"><form id="creativeNoteForm">
+    <h2 id="creativeNoteTitle">Note for reviewer</h2>
+    <label class="field">What should the reviewer check?<textarea id="creativeNoteInput" rows="4" maxlength="1000"></textarea></label>
+    <p id="creativeNoteError" class="notice error" role="status" hidden></p>
+    <div class="actions"><button type="button" data-close="creativeNoteDialog">Cancel</button><button id="saveCreativeNote" class="primary">Save note</button></div>
+  </form></dialog>
+  <dialog id="membersDialog" aria-labelledby="membersTitle">
+    <h2 id="membersTitle">People &amp; roles</h2>
+    <p>Artworkers can upload images and submit rounds for this project. Reviewers enter through links to their submitted rounds. Treat each link as a password.</p>
+    <div id="memberList"></div>
+    <form id="memberForm">
+      <label class="field">Email<input id="memberEmail" type="email" maxlength="254" required></label>
+      <label class="field">Role<select id="memberRole"><option value="artworker">Artworker</option><option value="reviewer">Reviewer</option></select></label>
+      <p id="memberError" class="notice error" role="status" hidden></p>
+      <div class="actions"><button type="button" data-close="membersDialog">Done</button><button id="addMember" class="primary">Add person</button></div>
+    </form>
+    <div id="memberLinkBox" hidden>
+      <label class="field">Artworker access link<input id="memberLink" readonly></label>
+      <div class="actions"><button id="copyMember" type="button">Copy access link</button><a id="emailMember" class="button">Open email draft</a></div>
+    </div>
+  </dialog>
   <!-- creative-end -->
 </body>
 </html>
