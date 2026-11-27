@@ -233,7 +233,7 @@ async function handleApprovals(request, response, pathname) {
     return await sendArtwork(response, approvals.artwork(entry[1], { token }));
   }
   if (entry && entry[2] === "/decision" && method === "POST") {
-    approvals.decide(token, entry[1], await readJson(request, 300_000));
+    approvals.decide(token, entry[1], await readJson(request, 750_000));
     return json(response, 200, approvals.review(token));
   }
   if (entry && entry[2] === "/feedback" && method === "GET") {

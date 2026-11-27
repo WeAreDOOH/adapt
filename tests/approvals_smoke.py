@@ -159,20 +159,67 @@ with sync_playwright() as driver:
     client.mouse.click(x + 75, y + 75)
     client.locator("#noteText").fill("Raise the headline into the safe area.")
     client.get_by_role("button", name="Save note").click()
-    client.get_by_role("button", name="Draw", exact=True).click()
+    client.get_by_role("button", name="Pen", exact=True).click()
     client.mouse.move(x + 110, y + 90)
     client.mouse.down()
     client.mouse.move(x + 160, y + 115, steps=8)
     client.mouse.up()
-    client.get_by_role("button", name="Add note").click()
+    client.get_by_role("button", name="Add note to Pen stroke 1", exact=True).click()
     client.locator("#noteText").fill("Retouch here.")
     client.get_by_role("button", name="Save note").click()
+    client.get_by_role("button", name="Circle / ellipse", exact=True).click()
+    client.get_by_role("button", name="Red", exact=True).click()
+    client.locator("#brush").select_option("12")
+    box = client.locator("#stage").bounding_box()
+    x, y = box["x"], box["y"]
+    client.keyboard.down("Shift")
+    client.mouse.move(x + 190, y + 55)
+    client.mouse.down()
+    client.mouse.move(x + 276, y + 114, steps=8)
+    client.mouse.up()
+    client.keyboard.up("Shift")
+    ellipse = client.locator("[data-stroke-kind=ellipse] ellipse")
+    assert ellipse.get_attribute("stroke") == "#ea263f"
+    assert ellipse.get_attribute("stroke-width") == "12"
+    assert abs(float(ellipse.get_attribute("rx")) - float(ellipse.get_attribute("ry"))) < 1
+    client.get_by_role("button", name="Add note to Circle / ellipse 2", exact=True).click()
+    client.locator("#noteText").fill("Make sure the logo is the correct colour.")
+    client.get_by_role("button", name="Save note").click()
+    client.get_by_role("button", name="Edit note on Circle / ellipse 2", exact=True).click()
+    assert client.locator("#noteText").input_value() == "Make sure the logo is the correct colour."
+    client.locator("#closeNote").click()
+    client.get_by_role("button", name="Marker", exact=True).click()
+    client.get_by_role("button", name="Yellow", exact=True).click()
+    client.locator("#brush").select_option("24")
+    box = client.locator("#stage").bounding_box()
+    client.mouse.move(box["x"] + 310, box["y"] + 170)
+    client.mouse.down()
+    client.mouse.move(box["x"] + 355, box["y"] + 186, steps=8)
+    client.mouse.up()
+    marker = client.locator("[data-stroke-kind=marker]")
+    assert marker.get_attribute("opacity") == "0.45"
+    client.get_by_role("button", name="Eraser").click()
+    client.get_by_role("button", name="Erase Marker stroke 3", exact=True).click()
+    assert marker.count() == 0
+    client.locator("#undo").click()
+    assert marker.count() == 1
+    client.locator("#redo").click()
+    assert marker.count() == 0
+    client.locator("#undo").click()
     client.locator("#changes").click()
     client.get_by_text("Review complete. Your decisions have been saved.").wait_for()
     owner.locator("#refresh").click()
     owner.get_by_role("button", name="Open amendments").click()
     owner.get_by_text("Raise the headline into the safe area.").wait_for()
     owner.get_by_text("Retouch here.").wait_for()
+    owner.get_by_role("button", name="Read note on Circle / ellipse 2", exact=True).click()
+    assert owner.locator("#noteReadOnly").inner_text() == "Make sure the logo is the correct colour."
+    owner.locator("#closeNote").click()
+    assert owner.locator("[data-stroke-kind=ellipse] ellipse").get_attribute("stroke-width") == "12"
+    assert owner.locator("[data-stroke-kind=marker]").count() == 1
+    with owner.expect_download() as annotated_download:
+        owner.locator("#downloadVersion").click()
+    assert annotated_download.value.path().read_bytes() == original
     owner.locator("#markupTools").click()
     owner.locator("#markupAccess").wait_for()
     assert owner.locator("#drawingTools").is_hidden()
@@ -273,4 +320,4 @@ with sync_playwright() as driver:
     assert planner.locator("#input").input_value() == draft_sizes
     assert not errors, errors
     browser.close()
-    print("PASS Creative: markup, mouse and touch guides, draft recovery and isolated practice exit")
+    print("PASS Creative: drawing tools, attached notes, original image bytes, guides and practice exit")

@@ -9,7 +9,19 @@ const statusNames = {
 };
 const blankFeedback = () => ({ comment: "", notes: [], strokes: [], guides: [] });
 const drafts = new Map();
-const undoByCreative = new WeakMap();
+const historyByCreative = new WeakMap();
+const tools = {
+  pan: "Drag to pan around the artwork.",
+  pen: "Draw freehand. Click the note icon on a mark to describe the change.",
+  marker: "Highlight an area with a translucent marker.",
+  ellipse: "Drag around the area. Hold Shift for a circle, then click its note icon.",
+  arrow: "Drag towards the detail you want to point out.",
+  box: "Drag a box around the area you want to call out.",
+  note: "Click the artwork to pin a note at that point.",
+  eraser: "Click a drawing or note pin to remove it. Use Undo to restore it.",
+};
+const drawingNames = { pen: "Pen stroke", marker: "Marker stroke", ellipse: "Circle / ellipse", box: "Box", arrow: "Arrow" };
+const freehand = (kind) => kind === "pen" || kind === "marker";
 const selected = new Set();
 const markedVersions = new Set();
 let workspace, review, current, feedback, pendingNote, gesture, imageUrl, generation = 0, navigationRequest = 0;
@@ -509,6 +521,7 @@ async function display(item, imagePath) {
   current = item;
   gesture = null;
   temporaryGuides = [];
+  $("annotationPins").replaceChildren();
   feedback = item.feedback || drafts.get(item.id) || blankFeedback();
   if (editable()) drafts.set(item.id, feedback);
   setNotice("status", "");
@@ -527,9 +540,12 @@ async function display(item, imagePath) {
   $("changes").disabled = $("approve").disabled = true;
   $("drawingTools").hidden = !editable();
   $("markupAccess").hidden = editable();
+  if (!editable()) $("markupAccess").textContent = client
+    ? "This decision has been submitted. You can open saved notes and add temporary guides."
+    : "Reviewer drawings and notes appear here after submission. You can open note badges and add temporary guides.";
   $("comment").value = feedback.comment;
   $("viewport").scrollTo(0, 0);
-  setTool("pan");
+  setTool(editable() && !$("markupPanel").hidden ? "pen" : "pan");
   fit = true;
   resize();
   draw();
@@ -557,16 +573,36 @@ async function display(item, imagePath) {
 function editable() { return client && current && !current.decision; }
 function movableGuides() { return editable() ? feedback.guides : temporaryGuides; }
 function changeGuides(change) {
-  const guides = movableGuides();
-  const previous = guides.slice();
-  recordUndo(() => guides.splice(0, guides.length, ...previous));
-  change(guides);
+  recordUndo();
+  change(movableGuides());
 }
-function recordUndo(action) {
-  const stack = undoByCreative.get(feedback) || [];
-  stack.push(action);
-  if (stack.length > 25) stack.shift();
-  undoByCreative.set(feedback, stack);
+function snapshotMarkup() {
+  return { notes: feedback.notes.slice(), strokes: feedback.strokes.slice(), guides: feedback.guides.slice(), temporary: temporaryGuides.slice() };
+}
+function recordUndo() {
+  const history = historyByCreative.get(feedback) || { undo: [], redo: [] };
+  history.undo.push(snapshotMarkup());
+  if (history.undo.length > 30) history.undo.shift();
+  history.redo.length = 0;
+  historyByCreative.set(feedback, history);
+}
+function stepMarkup(from, to) {
+  if (!feedback) return;
+  const history = historyByCreative.get(feedback);
+  const state = history?.[from].pop();
+  if (!state) return;
+  history[to].push(snapshotMarkup());
+  const { temporary, ...markup } = state;
+  Object.assign(feedback, markup);
+  temporaryGuides = temporary;
+  draw();
+  renderFeedback();
+}
+function removeAnnotation(kind, index) {
+  recordUndo();
+  feedback[kind].splice(index, 1);
+  draw();
+  renderFeedback();
 }
 $("backWorkspace").onclick = () => {
   generation++;
@@ -658,6 +694,7 @@ $("markupTools").onclick = () => {
   if (expanded) {
     $("rulers").setAttribute("aria-pressed", "true");
     $("overlayToggle").setAttribute("aria-pressed", "true");
+    if (editable() && tool === "pan") setTool("pen");
     resize();
   } else setTool("pan");
 };
@@ -699,10 +736,42 @@ function setTool(value) {
   for (const control of root.querySelectorAll("button[data-tool]")) {
     control.setAttribute("aria-pressed", control.dataset.tool === value);
   }
+  $("toolHint").textContent = tools[value];
+  updateInkPreview();
   if (value !== "pan" && !on("overlayToggle")) toggle("overlayToggle");
   draw();
 }
 root.querySelectorAll("button[data-tool]").forEach((control) => { control.onclick = () => setTool(control.dataset.tool); });
+const swatches = [
+  ["Red", "#ea263f"], ["Orange", "#ff9d38"], ["Yellow", "#ffe052"], ["Green", "#28d799"],
+  ["Blue", "#45a5ff"], ["White", "#ffffff"], ["Black", "#10131a"],
+];
+$("inkSwatches").append(...swatches.map(([name, colour]) => {
+  const control = button("", () => { $("colour").value = colour; updateInkPreview(); });
+  control.className = "ink-swatch";
+  control.style.setProperty("--swatch", colour);
+  control.setAttribute("aria-label", name);
+  control.title = name;
+  control.dataset.colour = colour;
+  return control;
+}));
+function updateInkPreview() {
+  const colour = $("colour").value;
+  const sample = $("inkPreview");
+  sample.setAttribute("stroke", colour);
+  sample.setAttribute("stroke-width", Math.min(16, Number($("brush").value)));
+  sample.setAttribute("stroke-linecap", tool === "marker" ? "square" : "round");
+  sample.setAttribute("opacity", tool === "marker" ? .45 : 1);
+  for (const control of $("inkSwatches").children) control.setAttribute("aria-pressed", control.dataset.colour === colour);
+}
+$("colour").oninput = $("brush").onchange = updateInkPreview;
+$("viewer").addEventListener("keydown", (event) => {
+  if ($("markupPanel").hidden || event.target.closest("input, textarea, select, [contenteditable]")) return;
+  if (!(event.metaKey || event.ctrlKey) || !["z", "y"].includes(event.key.toLowerCase())) return;
+  event.preventDefault();
+  const redo = event.shiftKey || event.key.toLowerCase() === "y";
+  stepMarkup(redo ? "redo" : "undo", redo ? "undo" : "redo");
+});
 $("viewport").addEventListener("keydown", (event) => {
   if (client && ["[", "]"].includes(event.key)) openClientPosition(position + (event.key === "]" ? 1 : -1));
   if (event.key === "+") $("zoomIn").click();
@@ -733,13 +802,13 @@ function draw() {
     });
     feedback.strokes.forEach((stroke, index) => nodes.push(drawStroke(stroke, w, h, index)));
     if (gesture?.kind === "stroke") nodes.push(drawStroke(gesture.stroke, w, h));
-    feedback.notes.forEach((note, index) => nodes.push(pin(note.point, index + 1, w, h, "#80cefa")));
   }
   temporaryGuides.forEach((guide, index) => {
     if (gesture?.kind !== "guide" || gesture.index !== index) nodes.push(guideLine(guide, index, w, h));
   });
   if (gesture?.kind === "guide") nodes.push(guideLine(gesture.guide, null, w, h));
   overlay.replaceChildren(...nodes);
+  if (!gesture) renderPins(w, h);
 }
 function guideLine(guide, index, w, h) {
   const x = clamp(guide.at) * w;
@@ -754,21 +823,77 @@ function guideLine(guide, index, w, h) {
   }
   return group;
 }
-function pin(point, label, w, h, colour) {
-  const x = point[0] * w, y = point[1] * h;
-  const group = svg("g", { "pointer-events": "none" });
-  const text = svg("text", { x, y: y + 4, "text-anchor": "middle", fill: "#10131a", "font-size": 11, "font-weight": 750 });
-  text.textContent = label;
-  group.append(svg("circle", { cx: x, cy: y, r: 10, fill: colour, stroke: "#10131a" }), text);
-  return group;
+function annotationPoint(kind, mark) {
+  if (kind === "notes") return mark.point;
+  const [first] = mark.points;
+  if (freehand(mark.kind)) return first;
+  const last = mark.points.at(-1);
+  if (mark.kind === "arrow") return last;
+  return [Math.max(first[0], last[0]), Math.min(first[1], last[1])];
+}
+function annotationLabel(kind, mark, index) {
+  return kind === "notes" ? `Pin ${index + 1}` : `${drawingNames[mark.kind]} ${index + 1}`;
+}
+function renderPins(w, h) {
+  const layer = $("annotationPins");
+  const existing = new Map([...layer.children].map((pin) => [pin.dataset.pin, pin]));
+  const keep = new Set();
+  if (on("overlayToggle")) {
+    for (const kind of ["notes", "strokes"]) {
+      feedback[kind].forEach((mark, index) => {
+        const content = kind === "notes" ? mark.text : mark.note;
+        if (!content && !editable()) return;
+        const key = kind + ":" + index;
+        keep.add(key);
+        let pin = existing.get(key);
+        if (!pin) {
+          pin = button("", () => {
+            if (editable() && tool === "eraser") removeAnnotation(kind, index);
+            else editNote(kind, index);
+          });
+          pin.dataset.pin = key;
+          pin.className = "annotation-pin";
+          const icon = svg("svg", { width: 13, height: 13, viewBox: "0 0 16 16", "aria-hidden": "true" });
+          icon.append(svg("path", { d: "M2 2.5h12v8.2H7l-3.5 3v-3H2Z", fill: "none", stroke: "currentColor", "stroke-width": 1.4, "stroke-linejoin": "round" }));
+          pin.append(icon, make("span"));
+          layer.append(pin);
+        }
+        pin.lastElementChild.textContent = kind === "notes" ? String(index + 1) : "D" + (index + 1);
+        const title = annotationLabel(kind, mark, index);
+        const action = editable() && tool === "eraser" ? "Erase "
+          : !editable() ? "Read note on " : content ? "Edit note on " : "Add note to ";
+        pin.title = action + title;
+        pin.setAttribute("aria-label", pin.title);
+        pin.style.setProperty("--mark-colour", kind === "notes" ? "#80cefa" : mark.colour);
+        const [x, y] = annotationPoint(kind, mark);
+        const offset = kind === "strokes" ? 13 : 0;
+        pin.style.left = Math.max(Math.min(w / 2, 17), Math.min(w - 17, x * w + offset)) + "px";
+        pin.style.top = Math.max(Math.min(h / 2, 14), Math.min(h - 14, y * h - offset)) + "px";
+      });
+    }
+  }
+  for (const [key, pin] of existing) if (!keep.has(key)) pin.remove();
+}
+function smoothPath(points) {
+  const path = ["M", ...points[0]];
+  for (let i = 1; i < points.length - 1; i++) {
+    const [x, y] = points[i];
+    const [nextX, nextY] = points[i + 1];
+    path.push("Q", x, y, (x + nextX) / 2, (y + nextY) / 2);
+  }
+  path.push("L", ...points.at(-1));
+  return path.join(" ");
 }
 function drawStroke(stroke, w, h, index) {
   const points = stroke.points.map(([x, y]) => [x * w, y * h]);
   const [x1, y1] = points[0], [x2, y2] = points.at(-1);
-  const style = { fill: "none", stroke: stroke.colour, "stroke-width": stroke.width, "stroke-linecap": "round", "stroke-linejoin": "round" };
-  const group = svg("g", { "pointer-events": "none" });
+  const marker = stroke.kind === "marker";
+  const style = { fill: "none", stroke: stroke.colour, "stroke-width": stroke.width, "stroke-linecap": marker ? "square" : "round", "stroke-linejoin": "round" };
+  const group = svg("g", { "pointer-events": "none", "data-stroke-kind": stroke.kind, opacity: marker ? .45 : 1 });
   if (stroke.kind === "box") {
     group.append(svg("rect", { ...style, x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) }));
+  } else if (stroke.kind === "ellipse") {
+    group.append(svg("ellipse", { ...style, cx: (x1 + x2) / 2, cy: (y1 + y2) / 2, rx: Math.abs(x2 - x1) / 2, ry: Math.abs(y2 - y1) / 2 }));
   } else if (stroke.kind === "arrow") {
     const angle = Math.atan2(y2 - y1, x2 - x1), length = 9 + stroke.width;
     const tip = [x2, y2];
@@ -778,17 +903,56 @@ function drawStroke(stroke, w, h, index) {
   } else if (points.length === 1) {
     group.append(svg("circle", { cx: x1, cy: y1, r: stroke.width / 2, fill: stroke.colour }));
   } else {
-    group.append(svg("polyline", { ...style, points: points.map((p) => p.join(",")).join(" ") }));
+    group.append(svg("path", { ...style, d: smoothPath(points) }));
   }
-  if (index !== undefined) group.append(pin(stroke.points[0], "D" + (index + 1), w, h, stroke.colour));
+  if (index !== undefined && editable() && tool === "eraser") {
+    group.dataset.eraseStroke = index;
+    for (const shape of [...group.children]) {
+      const target = shape.cloneNode(false);
+      target.setAttribute("stroke", "transparent");
+      target.setAttribute("stroke-width", String(stroke.width + 12));
+      target.setAttribute("pointer-events", "stroke");
+      group.append(target);
+    }
+  }
   return group;
 }
 function canvasPoint(event) {
   const rect = $("stage").getBoundingClientRect();
   return [(event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height];
 }
+function shapeEnd(event, stroke) {
+  const point = roundedPoint(canvasPoint(event));
+  if (stroke.kind !== "ellipse" || !event.shiftKey) return point;
+  const [x, y] = stroke.points[0];
+  const { width, height } = $("stage").getBoundingClientRect();
+  const sx = point[0] < x ? -1 : 1;
+  const sy = point[1] < y ? -1 : 1;
+  const span = Math.min(Math.max(Math.abs(point[0] - x) * width, Math.abs(point[1] - y) * height),
+    (sx < 0 ? x : 1 - x) * width, (sy < 0 ? y : 1 - y) * height);
+  return roundedPoint([x + sx * span / width, y + sy * span / height]);
+}
+function sampleStroke(stroke, event, limit) {
+  const points = stroke.points;
+  const point = roundedPoint(canvasPoint(event));
+  const last = points.at(-1);
+  if (last[0] === point[0] && last[1] === point[1]) return;
+  if (points.length >= limit) {
+    if (limit <= 3) points.splice(1);
+    else stroke.points = points.filter((_, index) => index % 2 === 0);
+  }
+  stroke.points.push(point);
+}
+let drawingFrame = 0;
+function redrawDuringGesture() {
+  if (drawingFrame) return;
+  drawingFrame = requestAnimationFrame(() => {
+    drawingFrame = 0;
+    draw();
+  });
+}
 function startGesture(event) {
-  if (!feedback || gesture || event.button !== 0) return;
+  if (!feedback || gesture || event.button !== 0 || event.target.closest(".annotation-pin")) return;
   const point = canvasPoint(event);
   const handle = event.target.dataset.guide;
   const ruler = event.target.closest(".ruler");
@@ -796,17 +960,26 @@ function startGesture(event) {
     const index = handle === undefined ? -1 : Number(handle);
     const guides = movableGuides();
     if (index < 0 && guides.length >= 50) return;
-    const axis = guides[index]?.axis || (ruler.id === "rulerX" ? "y" : "x");
+    const axis = guides[index]?.axis || (ruler?.id === "rulerX" ? "y" : "x");
     gesture = { kind: "guide", index, guide: { axis, at: point[axis === "x" ? 0 : 1] } };
     if (editable() && !on("overlayToggle")) toggle("overlayToggle");
+  } else if (editable() && tool === "eraser") {
+    const target = event.target.closest("[data-erase-stroke]");
+    if (target) removeAnnotation("strokes", Number(target.dataset.eraseStroke));
+    return;
   } else if (!editable() || tool === "pan") {
     gesture = { kind: "pan", x: event.clientX, y: event.clientY, left: $("viewport").scrollLeft, top: $("viewport").scrollTop };
   } else if (tool === "note") {
     if (feedback.notes.length < 50) editNote("notes", -1, roundedPoint(point));
     return;
   } else {
-    if (feedback.strokes.length >= 100 || feedback.strokes.reduce((n, stroke) => n + stroke.points.length, 0) >= 9000) return;
-    gesture = { kind: "stroke", stroke: { kind: tool, points: [roundedPoint(point)], note: "", colour: $("colour").value, width: Number($("brush").value) } };
+    const remaining = 9000 - feedback.strokes.reduce((total, stroke) => total + stroke.points.length, 0);
+    if (feedback.strokes.length >= 100 || remaining < 2) {
+      $("toolHint").textContent = "This creative has reached its drawing limit. Erase a mark to make room.";
+      return;
+    }
+    gesture = { kind: "stroke", limit: Math.min(remaining, 400),
+      stroke: { kind: tool, points: [roundedPoint(point)], note: "", colour: $("colour").value, width: Number($("brush").value) } };
   }
   event.preventDefault();
   $("stage").setPointerCapture(event.pointerId);
@@ -823,10 +996,12 @@ function moveGesture(event) {
   if (gesture.kind === "guide") gesture.guide.at = point[gesture.guide.axis === "x" ? 0 : 1];
   else {
     const stroke = gesture.stroke;
-    if (stroke.kind !== "pen") stroke.points.splice(1, 1, roundedPoint(point));
-    else if (stroke.points.length < 400) stroke.points.push(roundedPoint(point));
+    if (freehand(stroke.kind)) {
+      const samples = event.getCoalescedEvents?.();
+      for (const sample of samples?.length ? samples : [event]) sampleStroke(stroke, sample, gesture.limit);
+    } else stroke.points.splice(1, 1, shapeEnd(event, stroke));
   }
-  draw();
+  redrawDuringGesture();
 }
 function finishGesture(event) {
   if (gesture?.pointerId !== event.pointerId) return;
@@ -843,9 +1018,13 @@ function finishGesture(event) {
     });
   }
   if (event.type === "pointerup" && result.kind === "stroke") {
-    if (result.stroke.kind !== "pen") result.stroke.points.splice(1, 1, roundedPoint(canvasPoint(event)));
-    feedback.strokes.push(result.stroke);
-    recordUndo(() => feedback.strokes.pop());
+    const stroke = result.stroke;
+    if (freehand(stroke.kind)) sampleStroke(stroke, event, result.limit);
+    else stroke.points.splice(1, 1, shapeEnd(event, stroke));
+    if (freehand(stroke.kind) || stroke.points[0].some((value, i) => value !== stroke.points[1][i])) {
+      recordUndo();
+      feedback.strokes.push(stroke);
+    }
   }
   draw();
   renderFeedback();
@@ -854,36 +1033,41 @@ $("stage").addEventListener("pointerdown", startGesture);
 $("stage").addEventListener("pointermove", moveGesture);
 $("stage").addEventListener("pointerup", finishGesture);
 $("stage").addEventListener("pointercancel", finishGesture);
+$("stage").addEventListener("lostpointercapture", finishGesture);
 
 function editNote(kind, index, point) {
-  pendingNote = { kind, index, point };
-  $("noteTitle").textContent = kind === "strokes" ? "Note on drawing" : "Canvas note";
-  $("noteText").value = feedback[kind][index]?.[kind === "strokes" ? "note" : "text"] || "";
+  const mark = feedback[kind][index];
+  const text = mark?.[kind === "strokes" ? "note" : "text"] || "";
+  const editing = editable();
+  if ((!text && !editing) || $("noteDialog").open) return;
+  pendingNote = editing ? { kind, index, point } : null;
+  $("noteTitle").textContent = mark ? annotationLabel(kind, mark, index) : "Canvas note";
+  $("noteField").hidden = $("saveNote").hidden = !editing;
+  $("noteReadOnly").hidden = editing;
+  $("noteReadOnly").textContent = text;
+  $("noteText").value = editing ? text : "";
+  $("closeNote").textContent = editing ? "Cancel" : "Close";
   $("noteDialog").showModal();
+  if (editing) $("noteText").focus();
 }
 $("noteForm").onsubmit = (event) => {
   event.preventDefault();
   const text = $("noteText").value.trim();
   if (!text || !pendingNote || !editable()) return;
   const { kind, index, point } = pendingNote;
+  recordUndo();
   if (index >= 0) {
     const property = kind === "strokes" ? "note" : "text";
-    const previous = feedback[kind][index][property];
-    recordUndo(() => { feedback[kind][index][property] = previous; });
-    feedback[kind][index][property] = text;
+    feedback[kind][index] = { ...feedback[kind][index], [property]: text };
   } else {
     feedback.notes.push({ text, point });
-    recordUndo(() => feedback.notes.pop());
   }
   $("noteDialog").close();
   draw();
   renderFeedback();
 };
-$("undo").onclick = () => {
-  undoByCreative.get(feedback)?.pop()?.();
-  draw();
-  renderFeedback();
-};
+$("undo").onclick = () => stepMarkup("undo", "redo");
+$("redo").onclick = () => stepMarkup("redo", "undo");
 function focusMark(point) {
   const viewport = $("viewport");
   const stage = $("stage");
@@ -899,19 +1083,17 @@ function renderFeedback() {
   for (const [kind, marks] of [["notes", feedback.notes], ["strokes", feedback.strokes], ["guides", feedback.guides]]) {
     marks.forEach((mark, i) => {
       const row = make("div", "", "mark");
-      const title = kind === "notes" ? `Pin ${i + 1}` : kind === "strokes" ? `D${i + 1} · ${mark.kind}` : `${mark.axis === "x" ? "Vertical" : "Horizontal"} guide · ${Math.round(mark.at * 100)}%`;
+      const title = kind === "guides" ? `${mark.axis === "x" ? "Vertical" : "Horizontal"} guide · ${Math.round(mark.at * 100)}%` : annotationLabel(kind, mark, i);
       const line = make("div", "", "actions");
       line.append(make("strong", title));
-      const point = mark.point || mark.points?.[0] || (mark.axis === "x" ? [mark.at, .5] : [.5, mark.at]);
+      const point = kind === "guides" ? (mark.axis === "x" ? [mark.at, .5] : [.5, mark.at]) : annotationPoint(kind, mark);
       line.append(button("Locate", () => focusMark(point)));
+      if (!editable() && (mark.text || mark.note)) line.append(button("Read note", () => editNote(kind, i)));
       if (editable()) {
         if (kind !== "guides") line.append(button(mark.note || mark.text ? "Edit note" : "Add note", () => editNote(kind, i)));
         line.append(button("Remove", () => {
           if (kind === "guides") changeGuides((guides) => guides.splice(i, 1));
-          else {
-            recordUndo(() => feedback[kind].splice(i, 0, mark));
-            marks.splice(i, 1);
-          }
+          else { removeAnnotation(kind, i); return; }
           draw();
           renderFeedback();
         }));
@@ -932,7 +1114,9 @@ function renderFeedback() {
       }));
     list.append(row);
   });
-  $("undo").disabled = !undoByCreative.get(feedback)?.length;
+  const history = historyByCreative.get(feedback);
+  $("undo").disabled = !history?.undo.length;
+  $("redo").disabled = !history?.redo.length;
 }
 
 async function initialise() {
@@ -1006,6 +1190,7 @@ return {
   refresh: () => perform(loadWorkspace),
   destroy() {
     lifetime.abort();
+    cancelAnimationFrame(drawingFrame);
     generation++;
     viewportObserver.disconnect();
     thumbnailObserver.disconnect();

@@ -55,15 +55,27 @@
           </div>
           <div id="markupPanel" hidden>
             <div id="drawingTools" class="toolbar drawing" aria-label="Annotation tools">
-              <button data-tool="pan" aria-pressed="true">Pan</button><button data-tool="note" aria-pressed="false">Pin note</button>
-              <button data-tool="pen" aria-pressed="false">Draw</button><button data-tool="arrow" aria-pressed="false">Arrow</button>
-              <button data-tool="box" aria-pressed="false">Box</button>
-              <label>Colour <input type="color" id="colour" value="#ef547d"></label>
-              <label>Brush <select id="brush"><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option></select></label>
+              <div class="tool-group" role="group" aria-label="Tools">
+                <button data-tool="pan" aria-pressed="true">Pan</button>
+                <button data-tool="pen" aria-pressed="false" title="Draw freehand with a round nib">Pen</button>
+                <button data-tool="marker" aria-pressed="false" title="Draw freehand with a translucent marker">Marker</button>
+                <button data-tool="ellipse" aria-pressed="false" title="Drag an ellipse. Hold Shift for a circle.">Circle / ellipse</button>
+                <button data-tool="arrow" aria-pressed="false">Arrow</button>
+                <button data-tool="box" aria-pressed="false">Box</button>
+                <button data-tool="note" aria-pressed="false">Pin note</button>
+                <button data-tool="eraser" aria-pressed="false" title="Click a mark to remove it">Eraser</button>
+              </div>
+              <div class="tool-group" role="group" aria-label="Stroke settings">
+                <label>Colour <input type="color" id="colour" value="#ea263f"></label>
+                <div id="inkSwatches" class="tool-group" aria-label="Colour presets"></div>
+                <label>Thickness <select id="brush"><option value="1">1 px</option><option value="2">2 px</option><option value="4" selected>4 px</option><option value="6">6 px</option><option value="8">8 px</option><option value="12">12 px</option><option value="16">16 px</option><option value="24">24 px</option><option value="32">32 px</option></select></label>
+                <svg class="ink-preview" width="32" height="24" aria-hidden="true"><path id="inkPreview" d="M5 17 L27 7" fill="none" stroke-linecap="round"/></svg>
+              </div>
+              <p class="tool-hint" id="toolHint"></p>
             </div>
             <div class="toolbar drawing" aria-label="Guide and overlay tools">
               <button id="horizontalGuide">Add horizontal guide</button><button id="verticalGuide">Add vertical guide</button>
-              <button id="undo">Undo</button><button id="overlayToggle" aria-pressed="true">Show annotations</button>
+              <button id="undo">Undo</button><button id="redo">Redo</button><button id="overlayToggle" aria-pressed="true">Show annotations</button>
             </div>
             <p class="canvas-help" id="markupAccess" hidden>Submitted markup is read-only here. Guides you add are temporary.</p>
           </div>
@@ -71,11 +83,18 @@
             <div id="stage" data-tool="pan">
               <img id="artwork" alt="" draggable="false">
               <svg id="markup" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+              <div id="annotationPins" aria-label="Notes on artwork"></div>
               <div id="safeFrame" hidden></div>
               <div id="rulerX" class="ruler ruler-x" title="Drag down for a horizontal guide" hidden></div><div id="rulerY" class="ruler ruler-y" title="Drag right for a vertical guide" hidden></div>
             </div>
           </div>
           <p id="canvasHelp" class="canvas-help" hidden>Drag down from the top ruler or right from the left ruler to add a guide. Drag a guide outside the artwork to remove it.</p>
+          <dialog id="noteDialog" aria-labelledby="noteTitle"><form id="noteForm">
+            <h2 id="noteTitle">Canvas note</h2>
+            <p id="noteReadOnly" class="note-copy" hidden></p>
+            <label class="field" id="noteField">Describe the amendment<textarea id="noteText" rows="4" maxlength="1000" required></textarea></label>
+            <div class="actions"><button type="button" id="closeNote" data-close="noteDialog">Cancel</button><button class="primary" id="saveNote">Save note</button></div>
+          </form></dialog>
         </section>
         <aside class="feedback">
           <div id="artworkerNote" class="notice" hidden><strong>Note from the artworker</strong><p id="artworkerNoteText"></p></div>
@@ -107,10 +126,6 @@
     <p id="inviteInfo"></p><label class="field">Private review link<input id="inviteLink" readonly></label>
     <div class="actions"><button type="button" data-close="inviteDialog">Done</button><button id="copyInvite">Copy link</button><a class="button primary" id="emailInvite">Open email draft</a><a class="button primary" id="tryReviewer" target="_blank" rel="noopener" hidden>Try as reviewer</a></div>
   </dialog>
-  <dialog id="noteDialog" aria-labelledby="noteTitle"><form id="noteForm">
-    <h2 id="noteTitle">Canvas note</h2><label class="field">Describe the amendment<textarea id="noteText" rows="4" maxlength="1000" required></textarea></label>
-    <div class="actions"><button type="button" data-close="noteDialog">Cancel</button><button class="primary">Save note</button></div>
-  </form></dialog>
   <dialog id="creativeNoteDialog" aria-labelledby="creativeNoteTitle"><form id="creativeNoteForm">
     <h2 id="creativeNoteTitle">Note for reviewer</h2>
     <label class="field">What should the reviewer check?<textarea id="creativeNoteInput" rows="4" maxlength="1000"></textarea></label>

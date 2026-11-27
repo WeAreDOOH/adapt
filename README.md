@@ -21,6 +21,12 @@ sizes. The flight check lists selected versions and omissions for each batch.
 Drop onto a particular size to upload to that box, then add an optional note on
 the draft. Notes accompany the specific version submitted in the round.
 
+In an open reviewer round, **Markup** gives you freehand pen and marker tools,
+arrows, boxes, circles and ellipses. Pick a colour and thickness, draw on the
+canvas, then click the badge next to the mark to attach a note. The artworker
+can open that badge on the submitted version. The drawing layer and its
+notes are saved separately from the original image.
+
 **People & roles** lets the plan owner add and revoke artworkers and reviewers.
 Artworkers enter through a project access link and can upload, annotate the
 submission with notes and submit to an active reviewer. They cannot grant access

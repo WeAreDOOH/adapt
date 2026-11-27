@@ -79,15 +79,32 @@ button:disabled { opacity: .48; cursor: default; }
 .toolbar output { min-width: 44px; text-align: center; font-size: .84rem; }
 .toolbar label { display: flex; gap: 5px; align-items: center; font-size: .85rem; }
 .toolbar input[type=color] { width: 30px; height: 28px; padding: 2px; }
+.tool-group { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+#drawingTools { gap: 9px; flex-direction: column; align-items: start; }
+.tool-hint { font-size: .83rem; }
+.toolbar .ink-swatch { width: 25px; height: 25px; padding: 0; border-radius: 50%; background: var(--swatch); }
+.toolbar .ink-swatch[aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ink-preview { background: var(--bg); border-radius: 6px; }
 #markupPanel { background: var(--raised); }
 #viewport { position: relative; overflow: auto; height: clamp(275px, 58vh, 780px); background: #0b0d11; padding: 36px; display: flex; }
 #stage { position: relative; flex: none; margin: auto; touch-action: none; }
 #stage[data-tool=pan] { cursor: grab; }
 #stage:not([data-tool=pan]) { cursor: crosshair; }
+#stage[data-tool=eraser] { cursor: cell; }
 #artwork, #markup { position: absolute; inset: 0; width: 100%; height: 100%; }
 #artwork { user-select: none; pointer-events: none; }
 #markup { overflow: visible; }
 #safeFrame { position: absolute; inset: 5%; border: 1px dashed #c4ff79; pointer-events: none; }
+#annotationPins { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.annotation-pin {
+  position: absolute; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 4px;
+  min-width: 29px; min-height: 27px; padding: 3px 5px; border: 2px solid var(--mark-colour);
+  background: #171d29; color: #fff; border-radius: 6px; box-shadow: 0 1px 3px #0008;
+  font-size: .67rem; font-weight: 700; line-height: 1; white-space: nowrap; pointer-events: auto;
+}
+.annotation-pin:hover { background: #334561; color: #fff; }
+.annotation-pin svg { flex-shrink: 0; }
+.note-copy { white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 14px; }
 .ruler { position: absolute; z-index: 1; background: #272d36; color: #f6f7fa; font-size: .72rem; user-select: none; touch-action: none; }
 .ruler:hover { background: #344b61; }
 .ruler-x { left: 0; right: 0; top: -28px; height: 28px; cursor: ns-resize; }
