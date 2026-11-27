@@ -1,4 +1,5 @@
 """Exercise the approval loop on an isolated Adapt server. Never point this at production."""
+import json
 import os
 import struct
 import zlib
@@ -49,6 +50,20 @@ with sync_playwright() as driver:
         owner.locator("#downloadVersion").click()
     assert download.value.path().read_bytes() == original
     owner.locator("#backWorkspace").click()
+    original_sizes = owner.locator("#input").input_value()
+    owner.evaluate("""sizes => {
+        const input = document.getElementById('input');
+        input.value = sizes;
+        input.dispatchEvent(new Event('input'));
+    }""", original_sizes + "\n800x600")
+    assert owner.locator("#creativeHost").is_hidden()
+    assert owner.locator("#stArtSup").inner_text() == "—"
+    owner.evaluate("""sizes => {
+        const input = document.getElementById('input');
+        input.value = sizes;
+        input.dispatchEvent(new Event('input'));
+    }""", original_sizes)
+    owner.get_by_text("1 of 2 sizes supplied", exact=False).wait_for()
 
     plan_id = owner.url.split("saved=")[1].split("&")[0]
     assert client.request.get(base + "/api/approvals/plans/" + plan_id).status == 403
@@ -199,17 +214,32 @@ with sync_playwright() as driver:
     client.get_by_text("Review unavailable", exact=True).wait_for()
     roles.get_by_role("button", name="Done").click()
 
-    owner.goto(base + "/?view=creative")
-    owner.locator("#startPractice").click()
-    owner.get_by_text("2 of 2 sizes supplied", exact=False).wait_for()
-    owner.locator("#flight").click()
+    planner = browser.new_page(viewport={"width": 1300, "height": 900})
+    draft_sizes = "\n".join(f"{800 + i}x600" for i in range(35))
+    legacy = json.dumps({"v": 1, "sizes": "640x360\n320x480", "o": {"allowDown": 1}})
+    planner.add_init_script(f"""(() => {{
+        if (!localStorage.getItem('adapt-planner-draft-v2')) {{
+            localStorage.setItem('ar-state', {json.dumps(legacy)});
+            localStorage.setItem('ar-draft', {json.dumps(draft_sizes)});
+        }}
+    }})();""")
+    planner.goto(base + "/?view=creative")
+    assert planner.locator("#input").input_value() == draft_sizes
+    with planner.context.expect_page() as new_tab:
+        planner.locator("#startPractice").click()
+    practice = new_tab.value
+    practice.get_by_text("2 of 2 sizes supplied", exact=False).wait_for()
+    assert practice.locator(".stats").is_hidden() and practice.locator("#startPractice").is_hidden()
+    assert practice.locator("#exitPractice").is_visible()
+    assert planner.locator("#input").input_value() == draft_sizes
+    practice.locator("#flight").click()
     for name in ["checkSpec", "checkLayout", "checkScope"]:
-        owner.locator("#" + name).check()
-    assert owner.locator("#recipient").is_hidden()
-    owner.locator("#submitRound").click()
-    owner.locator("#tryReviewer").wait_for()
-    assert owner.locator("#emailInvite").is_hidden()
-    practice_link = owner.locator("#inviteLink").input_value()
+        practice.locator("#" + name).check()
+    assert practice.locator("#recipient").is_hidden()
+    practice.locator("#submitRound").click()
+    practice.locator("#tryReviewer").wait_for()
+    assert practice.locator("#emailInvite").is_hidden()
+    practice_link = practice.locator("#inviteLink").input_value()
     phone = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
     touch_reviewer = phone.new_page()
     touch_reviewer.goto(practice_link)
@@ -224,8 +254,8 @@ with sync_playwright() as driver:
     touch.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
     assert touch_reviewer.locator("[data-guide]").count() == 1
     phone.close()
-    with owner.context.expect_page() as opened:
-        owner.locator("#tryReviewer").click()
+    with practice.context.expect_page() as opened:
+        practice.locator("#tryReviewer").click()
     practice_reviewer = opened.value
     practice_reviewer.get_by_text("Practice reviewer", exact=True).wait_for()
     practice_reviewer.locator("#markupTools").click()
@@ -233,9 +263,14 @@ with sync_playwright() as driver:
     practice_reviewer.locator("#comment").fill("Move the headline up.")
     practice_reviewer.locator("#changes").click()
     practice_reviewer.get_by_text("Decision saved.", exact=True).wait_for()
-    owner.locator("#inviteDialog").get_by_role("button", name="Done").click()
-    owner.locator("#refresh").click()
-    owner.get_by_role("button", name="Open amendments").wait_for()
+    practice.locator("#inviteDialog").get_by_role("button", name="Done").click()
+    practice.locator("#refresh").click()
+    practice.get_by_role("button", name="Open amendments").wait_for()
+    practice.locator("#exitPractice").click()
+    practice.locator("#startPractice").wait_for()
+    assert practice.locator("#input").input_value() == draft_sizes
+    planner.reload()
+    assert planner.locator("#input").input_value() == draft_sizes
     assert not errors, errors
     browser.close()
-    print("PASS Creative: saved artwork, notes, scoped roles, markup, versions, revocation and practice walkthrough")
+    print("PASS Creative: markup, mouse and touch guides, draft recovery and isolated practice exit")

@@ -441,6 +441,10 @@ button.linkish:hover{text-decoration:underline;background:none}
 .creative-gate{padding:14px;border:1px solid var(--line);border-radius:5px;background:var(--raised);margin:12px 0}
 #creativeMasters{margin-top:16px}
 #creativeMasters > summary{cursor:pointer;margin-bottom:12px}
+#startPractice,#exitPractice{display:inline-flex;align-items:center;min-height:30px;padding:4px 12px;border:1px solid var(--accent);border-radius:4px;color:var(--accent);font-size:.8125rem;text-decoration:none}
+#startPractice:hover,#exitPractice:hover{background:var(--accent-soft)}
+body.practice-mode .stats,body.practice-mode .inpanel,body.practice-mode #creativeMasters{display:none}
+body.practice-mode #mainGrid{grid-template-columns:minmax(0,1fr)}
 .filecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;align-items:stretch}
 .fcard{background:var(--raised);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .fcard.have{border-left-color:var(--muted)}
@@ -734,7 +738,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
 
     <section class="panel results" aria-label="Results">
       <div id="paneArt" role="tabpanel" aria-labelledby="cardArt" hidden>
-        <div class="pane-head"><h2 class="pane-title">Creative</h2><button type="button" id="startPractice">Start a practice review</button></div>
+        <div class="pane-head"><h2 class="pane-title" id="creativeTitleHeading">Creative</h2><a id="startPractice" href="/?view=creative&amp;practice=start" target="_blank" rel="noopener">Start a practice review</a><a id="exitPractice" href="/" hidden>Exit practice</a></div>
         <p id="practiceStatus" class="help" role="status" hidden></p>
         <div class="creative-gate" id="creativeGate">
           <p class="help" id="creativeGateText" role="status">Save a plan to upload and keep its artwork.</p>
@@ -1571,7 +1575,27 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     if($('art').value.trim())$('artBox').open=true;
     return true;
   }
-  function queueSave(){clearTimeout(stateT);stateT=setTimeout(()=>{try{localStorage.setItem('ar-state',JSON.stringify(getState()))}catch(e){}},300);}
+  const draftKey='adapt-planner-draft-v2';
+  function savePlannerDraft(){
+    if(!plannerDraftReady||currentSavedId||practicePlan)return;
+    try{localStorage.setItem(draftKey,JSON.stringify(getState()));}catch(e){}
+  }
+  function queueSave(){
+    if(!plannerDraftReady||currentSavedId||practicePlan)return;
+    clearTimeout(stateT);stateT=setTimeout(savePlannerDraft,300);
+  }
+  function readPlannerDraft(){
+    const current=localStorage.getItem(draftKey);
+    if(current)return JSON.parse(current);
+    const previous=JSON.parse(localStorage.getItem('ar-state')||'null');
+    const previousSizes=localStorage.getItem('ar-draft');
+    const sample=(sizes)=>typeof sizes==='string'&&sizes.trim().replace(/\r/g,'')==='640x360\n320x480';
+    if(previous&&!sample(previous.sizes))return previous;
+    // Earlier practice sessions could replace the planner snapshot. The old
+    // size-only draft may still hold the user's original entries.
+    if(previousSizes!==null&&!sample(previousSizes))return {...previous,sizes:previousSizes};
+    return null;
+  }
   const b64u=bytes=>{let s='';bytes.forEach(b=>s+=String.fromCharCode(b));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
   const unb64u=str=>{const s=atob(str.replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(s,c=>c.charCodeAt(0));};
   async function encodePlan(st){
@@ -1588,7 +1612,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   }
   const planFrom=text=>{const m=String(text).match(/[#?&]plan=([A-Za-z0-9_-]+)/)||String(text).trim().match(/^([zj][A-Za-z0-9_-]{8,})$/);return m?m[1]:null;};
   async function openPlan(code,fromLink){
-    try{const st=await decodePlan(code);if(currentSavedId)resetCreativeProject();applyState(st);currentSavedId='';$('planName').value='';$('shareSaved').hidden=true;$('savedStatus').textContent='';$('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();if(!$('paneArt').hidden)syncCreative();toast(fromLink?'Opened the shared plan':'Plan opened');return true;}
+    try{const st=await decodePlan(code);if(currentSavedId)resetCreativeProject();applyState(st);currentSavedId='';practicePlan=false;plannerDraftReady=true;setPracticeLayout(false);$('planName').value='';$('shareSaved').hidden=true;$('savedStatus').textContent='';$('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();if(!$('paneArt').hidden)syncCreative();toast(fromLink?'Opened the shared plan':'Plan opened');return true;}
     catch(e){toast('That link doesn\'t contain a readable plan');return false;}
   }
   $('shareBtn').onclick=async()=>{
@@ -1600,16 +1624,18 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   $('planIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('planOpen').click();});
 
   // ---------- named plans: unlisted view links, browser-held edit keys ----------
-  let currentSavedId='', savedPlanSizes='', practicePlan=false;
+  let currentSavedId='', savedPlanSizes='', practicePlan=false, plannerDraftReady=false;
   const ownedPlans=()=>{try{const v=JSON.parse(localStorage.getItem('adapt-owned-plans')||'[]');return Array.isArray(v)?v:[]}catch(e){return []}};
   const savedLink=id=>location.origin+location.pathname+'?saved='+encodeURIComponent(id);
   function rememberOwned(plan){const rows=ownedPlans().filter(x=>x.id!==plan.id);rows.unshift({id:plan.id,name:plan.name,editKey:plan.editKey||'',updatedAt:plan.updatedAt});try{localStorage.setItem('adapt-owned-plans',JSON.stringify(rows))}catch(e){}renderOwnedPlans();}
   function renderOwnedPlans(){const rows=ownedPlans();$('savedList').innerHTML=rows.length?rows.map(x=>'<div class="saveditem"><span class="savedname" title="'+esc(x.name)+'">'+esc(x.name)+'</span><button type="button" data-open-saved="'+esc(x.id)+'">Open</button><button type="button" data-share-saved="'+esc(x.id)+'">Share</button></div>').join(''):'<span class="hint">No named plans saved in this browser yet.</span>';}
   async function openSavedPlan(id,fromLink){
+    savePlannerDraft();
     try{const r=await fetch('/api/plans/'+encodeURIComponent(id),{headers:{Accept:'application/json'}}),data=await r.json();if(!r.ok)throw new Error(data.error||'Plan not found');
       if(currentSavedId!==data.id)resetCreativeProject();
       applyState(data.plan);currentSavedId=data.id;savedPlanSizes=data.plan.sizes;practicePlan=data.plan.practice===true;$('planName').value=data.name;$('saveBox').open=true;$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
-      const creative=new URLSearchParams(location.search).get('view')==='creative'||!$('paneArt').hidden;
+      setPracticeLayout(practicePlan);
+      const creative=practicePlan||new URLSearchParams(location.search).get('view')==='creative'||!$('paneArt').hidden;
       history.replaceState(null,'',savedLink(data.id)+(creative?'&view=creative':''));
       $('restored').hidden=true;$('sharedNote').hidden=!!creativeOwner();renderGrid();render();if(creative)showTab('art');toast(fromLink?'Opened the saved plan':'Plan opened');return true;
     }catch(e){toast(e.message||'That saved plan could not be opened');return false;}}
@@ -2005,7 +2031,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     // artwork whose file left the plan goes back to the loose tray
     [...artMap.keys()].forEach(k=>{if(!rows.some(r=>r.F.label===k)){artLoose.push(artMap.get(k));artMap.delete(k);}});
     const sizesTotal=rows.reduce((t,r)=>t+r.fm.reduce((u,x)=>u+x.z.count,0),0),sizesDone=have.reduce((t,r)=>t+r.fm.reduce((u,x)=>u+x.z.count,0),0);
-    if(!creativeApp)$('stArtSup').textContent=rows.length?have.length+' / '+rows.length:'0';
+    if(!creativeApp)$('stArtSup').textContent=creativeOwner()&&savedPlanSizes!==input.value?'—':rows.length?have.length+' / '+rows.length:'0';
     $('artBar').style.width=(rows.length?100*have.length/rows.length:0)+'%';
     $('artProgText').textContent=!rows.length?'Add some sizes first.':have.length===rows.length?'All '+rows.length+' files supplied, covering all '+sizesTotal+' sizes.':
       have.length+' of '+rows.length+' files supplied, covering '+sizesDone+' of '+sizesTotal+' sizes. Still needed: '+rows.filter(r=>!artMap.has(r.F.label)).map(r=>r.F.label).join(', ')+'.';
@@ -2036,11 +2062,12 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
       if(a&&z){const box=cv.parentElement;drawFit(cv,a,r,z.z,parseFloat(box.style.width),parseFloat(box.style.height));}});
   }
   $('artInput').addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value='';});
-  let creativeApp, creativeIdentity, creativeLoad, creativeGeneration=0;
+  let creativeApp, creativeIdentity, creativeLoad, creativeCount='', creativeGeneration=0;
   function clearCreativeWorkspace(){
     creativeGeneration++;
     creativeApp?.destroy();
     creativeApp=creativeIdentity=creativeLoad=null;
+    creativeCount='';
     $('creativeHost').shadowRoot?.replaceChildren();
     $('creativeHost').hidden=true;
   }
@@ -2053,19 +2080,36 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   function creativeOwner(){
     return ownedPlans().find((entry)=>entry.id===currentSavedId&&entry.editKey);
   }
+  function setPracticeLayout(active){
+    document.body.classList.toggle('practice-mode',active);
+    $('startPractice').hidden=active;
+    $('exitPractice').hidden=!active;
+    $('creativeTitleHeading').textContent=active?'Practice review':'Creative';
+    $('paneArt').setAttribute('aria-labelledby',active?'creativeTitleHeading':'cardArt');
+    if(active){
+      let previous='';
+      try{previous=sessionStorage.getItem('adapt-practice-return-'+currentSavedId)||'';}catch(e){}
+      $('exitPractice').href=/^[A-Za-z0-9_-]{16}$/.test(previous)?savedLink(previous)+'&view=creative':'/?view=creative';
+    }
+  }
   function updateCreativeGate(){
     const owns=creativeOwner();
-    const dirty=!!owns&&savedPlanSizes!==input.value;
+    const dirty=!!owns&&!practicePlan&&savedPlanSizes!==input.value;
     const gate=$('creativeGate');
     gate.hidden=!!creativeApp&&!dirty;
+    $('creativeHost').hidden=!creativeApp||dirty;
     $('creativeSaveRow').hidden=!!owns&&!dirty;
     $('creativeSave').textContent=dirty?'Save size changes':'Save plan';
     $('creativePlanName').hidden=dirty;
-    if(dirty)$('creativeGateText').textContent='Save the current size list to update the Creative queue.';
-    else if(!owns)$('creativeGateText').textContent=currentSavedId
+    if(dirty){
+      $('stArtSup').textContent='—';
+      $('creativeGateText').textContent='The size list has unsaved changes. Save them to update the Creative queue.';
+    }
+    else if(creativeCount&&creativeApp)$('stArtSup').textContent=creativeCount;
+    if(!dirty&&!owns)$('creativeGateText').textContent=currentSavedId
       ?'Save a copy of this plan to start your own Creative queue.'
       :'Name this plan to save your artwork and approval history.';
-    else if(!creativeApp)$('creativeGateText').textContent='Loading saved artwork…';
+    else if(!dirty&&!creativeApp)$('creativeGateText').textContent='Loading saved artwork…';
   }
   async function creativeRequest(owns, endpoint, options){
     const response=await fetch('/api/approvals/plans/'+owns.id+endpoint,{
@@ -2080,6 +2124,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     const owns=creativeOwner();
     updateCreativeGate();
     if(!owns)return;
+    if(!practicePlan&&savedPlanSizes!==input.value)return;
     const identity=owns.id+'\n'+savedPlanSizes;
     if(creativeIdentity===identity){
       if(creativeApp)await creativeApp.refresh();
@@ -2103,7 +2148,8 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
         host.hidden=false;
         creativeApp=mountApprovals(root,{planId:owns.id,onWorkspace(workspace){
           if(generation!==creativeGeneration)return;
-          $('stArtSup').textContent=workspace.formats.filter((size)=>size.versions.length).length+' / '+workspace.formats.length;
+          creativeCount=workspace.formats.filter((size)=>size.versions.length).length+' / '+workspace.formats.length;
+          updateCreativeGate();
         }});
         await creativeApp.ready;
         if(generation===creativeGeneration)updateCreativeGate();
@@ -2143,17 +2189,28 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     ctx.fillText('A CREATIVE REVIEW SAMPLE',width*.08,height*.72,width*.84);
     return new Promise((resolve,reject)=>canvas.toBlob((blob)=>blob?resolve(blob):reject(new Error('Could not render sample artwork.')),'image/png'));
   }
-  $('startPractice').onclick=async()=>{
-    const control=$('startPractice'),message=$('practiceStatus');
+  $('startPractice').onclick=()=>{
+    savePlannerDraft();
+    const url=new URL('/?view=creative&practice=start',location.href);
+    if(currentSavedId&&!practicePlan)url.searchParams.set('from',currentSavedId);
+    $('startPractice').href=url.href;
+  };
+  async function startPractice(previous){
+    const message=$('practiceStatus');
     const formats=[{width:640,height:360},{width:320,height:480}];
     let saved;
-    control.disabled=true;message.hidden=false;message.textContent='Preparing sample artwork…';
+    setPracticeLayout(true);
+    $('creativeGate').hidden=true;
+    message.hidden=false;message.textContent='Preparing two sample creatives…';
     try{
       const plan={v:1,sizes:formats.map(({width,height})=>width+'x'+height).join('\n'),art:'',o:{allowDown:1},practice:true};
       const response=await fetch('/api/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Practice · After Hours',plan})});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Could not create the practice plan.');
       saved=data;rememberOwned(saved);
+      if(/^[A-Za-z0-9_-]{16}$/.test(previous||'')){
+        try{sessionStorage.setItem('adapt-practice-return-'+saved.id,previous);}catch(e){}
+      }
       await creativeRequest(saved,'/formats',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formats})});
       for(const {width,height} of formats){
         const size=width+'x'+height;
@@ -2161,15 +2218,15 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
           'Content-Type':'application/octet-stream','X-File-Name':'practice-'+size+'.png','X-Adapt-Initial-Artwork':'1',
         }});
       }
-      location.assign(savedLink(saved.id)+'&view=creative');
+      location.replace(savedLink(saved.id)+'&view=creative');
     }catch(error){
       message.textContent=error.message;
       if(saved){
         const link=document.createElement('a');link.href=savedLink(saved.id)+'&view=creative';link.textContent='Open the practice plan';
         message.append(' ',link);
       }
-    }finally{control.disabled=false;}
-  };
+    }
+  }
 
   // Save derived delivery images with the same placement rules used by the previews.
   async function saveGeneratedSizes() {
@@ -2345,8 +2402,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     finally{btn.disabled=false;btn.innerHTML=was;}
   };
 
-  let saveT;
-  input.addEventListener('input',e=>{if(document.activeElement&&!$('sizeGrid').contains(document.activeElement))renderGrid();render();clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('ar-draft',input.value)}catch(e){}},300)});
+  input.addEventListener('input',()=>{if(document.activeElement&&!$('sizeGrid').contains(document.activeElement))renderGrid();render();});
   $('example').onclick=()=>{input.value='3840x2160\n1920x1080\n1920x1080\n1600x900\n1280x720\n1366x768\n1360x768\n2560x1600\n1920x1200\n1440x900\n1024x768\n800x600\n640x480\n5120x2160\n2560x1080\n3440x1440\n2160x3840\n1080x1920\n1080x1350\n1080x1080\n6000x4000\n1200x628\n728x90\n1100x180\n1000x180\n2560x1440\n1600x1200\n720x1280\n500x500\n3000x2000\n2200x360';input.dispatchEvent(new Event('input'))};
   $('clear').onclick=()=>{input.value='';input.dispatchEvent(new Event('input'));(szMode==='grid'?$('sizeGrid').querySelector('.szadd'):input).focus()};
   // ---------- sizes as a grid of cells, laid out in columns; the textarea stays the source of truth ----------
@@ -2398,17 +2454,25 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   // keep the grid in step with anything else that changes the sizes (example, clear, shared plans)
   setTimeout(()=>renderGrid(),0);
 
-  const savedCode=new URLSearchParams(location.search).get('saved');
+  const query=new URLSearchParams(location.search);
+  const savedCode=query.get('saved');
+  const practiceStart=!savedCode&&query.get('practice')==='start';
   const hashCode=planFrom(location.hash);
   if(savedCode&&/^[A-Za-z0-9_-]{16}$/.test(savedCode))openSavedPlan(savedCode,true);
-  else if(!hashCode){try{const st=JSON.parse(localStorage.getItem('ar-state')||'null');
-    if(st&&applyState(st)){if(input.value.trim())$('restored').hidden=false;}
-    else{const d=localStorage.getItem('ar-draft');if(d&&d.trim()){input.value=d;$('restored').hidden=false;}}}catch(e){}}
-  else openPlan(hashCode,true);
+  else if(!hashCode&&!practiceStart){
+    plannerDraftReady=true;
+    try{const st=readPlannerDraft();if(st&&applyState(st)&&input.value.trim())$('restored').hidden=false;}catch(e){}
+  }
+  else if(hashCode)openPlan(hashCode,true);
   $('useExample').onclick=()=>{$('example').click();};
-  input.addEventListener('input',()=>{$('restored').hidden=true;$('sharedNote').hidden=true;if(!$('paneArt').hidden&&location.protocol!=='file:')updateCreativeGate();});
+  input.addEventListener('input',()=>{$('restored').hidden=true;$('sharedNote').hidden=true;if(location.protocol!=='file:')updateCreativeGate();});
+  window.addEventListener('pagehide',savePlannerDraft);
   render();
-  if(!savedCode&&new URLSearchParams(location.search).get('view')==='creative')showTab('art');
+  if(practiceStart){
+    showTab('art');
+    history.replaceState(null,'','/?view=creative');
+    startPractice(query.get('from'));
+  }else if(!savedCode&&query.get('view')==='creative')showTab('art');
 })();
 </script>
 <script src="/msal-browser.min.js?v=5.29.0"></script>
