@@ -759,7 +759,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
           <link rel="stylesheet" href="/approvals.css">
           <!-- embed-creative-workspace -->
         </template>
-        <details class="artbox" id="creativeMasters">
+        <details class="artbox" id="creativeMasters" open>
         <summary>Adapt artwork from master files</summary>
         <div class="pane-head"><h3 class="pane-title">Master previews</h3>
           <div class="row" style="margin:0"><label class="tlpick" title="Default tramline colour, used by every file without its own">Default tramlines <input type="color" id="tlColor2" value="#000000" aria-label="Tramline colour"></label><button type="button" class="pickbtn" data-pick title="Pick a colour from your artwork" aria-label="Pick a tramline colour from your artwork"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14.5 5.5l4 4M17 3l4 4-3 3-4-4 3-3zM14 6L5 15l-1 5 5-1 9-9"/></svg></button><button type="button" id="safeBtn" class="toggle" aria-pressed="true">Safe area</button><button type="button" class="primary" id="dlSizes" hidden aria-label="Download all sizes"><svg class="bi" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>All sizes</button></div></div>
@@ -2130,7 +2130,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     return result;
   }
   async function syncCreative(){
-    if(location.protocol==='file:'){$('creativeGate').hidden=true;$('creativeMasters').open=true;return;}
+    if(location.protocol==='file:'){$('creativeGate').hidden=true;return;}
     const owns=creativeOwner();
     updateCreativeGate();
     if(!owns)return;
