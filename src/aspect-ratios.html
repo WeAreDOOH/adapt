@@ -442,6 +442,7 @@ button.linkish:hover{text-decoration:underline;background:none}
 #creativeMasters{margin-top:16px}
 #creativeMasters > summary{cursor:pointer;margin-bottom:12px}
 #startPractice,#exitPractice{display:inline-flex;align-items:center;min-height:30px;padding:4px 12px;border:1px solid var(--accent);border-radius:4px;color:var(--accent);font-size:.8125rem;text-decoration:none}
+#startPractice{width:36px;height:34px;padding:0;justify-content:center}
 #startPractice:hover,#exitPractice:hover{background:var(--accent-soft)}
 body.practice-mode .stats,body.practice-mode .inpanel,body.practice-mode #creativeMasters{display:none}
 body.practice-mode #mainGrid{grid-template-columns:minmax(0,1fr)}
@@ -738,7 +739,16 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
 
     <section class="panel results" aria-label="Results">
       <div id="paneArt" role="tabpanel" aria-labelledby="cardArt" hidden>
-        <div class="pane-head"><h2 class="pane-title" id="creativeTitleHeading">Creative</h2><a id="startPractice" href="/?view=creative&amp;practice=start" target="_blank" rel="noopener">Start a practice review</a><a id="exitPractice" href="/" hidden>Exit practice</a></div>
+        <div class="pane-head">
+          <h2 class="pane-title" id="creativeTitleHeading">Creative</h2>
+          <a id="startPractice" href="/?view=creative&amp;practice=start" target="_blank" rel="noopener"
+             title="Start a practice review" aria-label="Start a practice review">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2 9l10-5 10 5-10 5-10-5zM6 11v5c3.4 2.7 8.6 2.7 12 0v-5M22 9v6"/>
+            </svg>
+          </a>
+          <a id="exitPractice" href="/" hidden>Exit practice</a>
+        </div>
         <p id="practiceStatus" class="help" role="status" hidden></p>
         <div class="creative-gate" id="creativeGate">
           <p class="help" id="creativeGateText" role="status">Save a plan to upload and keep its artwork.</p>
