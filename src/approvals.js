@@ -13,6 +13,7 @@ const undoByCreative = new WeakMap();
 const selected = new Set();
 const markedVersions = new Set();
 let workspace, review, current, feedback, pendingNote, gesture, imageUrl, generation = 0, navigationRequest = 0;
+let temporaryGuides = [];
 let position = 0, filter = "all", tool = "pan", zoom = 1, fit = true, busy = false;
 let reviewKey = "";
 let ownerKey = "", workspaceKey = "", editingVersion = "";
@@ -507,6 +508,7 @@ async function openClientPosition(index) {
 async function display(item, imagePath) {
   current = item;
   gesture = null;
+  temporaryGuides = [];
   feedback = item.feedback || drafts.get(item.id) || blankFeedback();
   if (editable()) drafts.set(item.id, feedback);
   setNotice("status", "");
@@ -524,6 +526,7 @@ async function display(item, imagePath) {
   $("decisionControls").hidden = !editable();
   $("changes").disabled = $("approve").disabled = true;
   $("drawingTools").hidden = !editable();
+  $("markupAccess").hidden = editable();
   $("comment").value = feedback.comment;
   $("viewport").scrollTo(0, 0);
   setTool("pan");
@@ -552,6 +555,13 @@ async function display(item, imagePath) {
 }
 
 function editable() { return client && current && !current.decision; }
+function movableGuides() { return editable() ? feedback.guides : temporaryGuides; }
+function changeGuides(change) {
+  const guides = movableGuides();
+  const previous = guides.slice();
+  recordUndo(() => guides.splice(0, guides.length, ...previous));
+  change(guides);
+}
 function recordUndo(action) {
   const stack = undoByCreative.get(feedback) || [];
   stack.push(action);
@@ -603,7 +613,7 @@ function resize() {
   if (!current || $("viewer").hidden) return;
   const [width, height] = current.size.split("x").map(Number);
   const viewport = $("viewport");
-  if (fit) zoom = Math.min((viewport.clientWidth - 58) / width, (viewport.clientHeight - 58) / height, 1);
+  if (fit) zoom = Math.max(.001, Math.min((viewport.clientWidth - 74) / width, (viewport.clientHeight - 74) / height, 1));
   const stage = $("stage");
   stage.style.width = Math.max(1, Math.round(width * zoom)) + "px";
   stage.style.height = Math.max(1, Math.round(height * zoom)) + "px";
@@ -641,11 +651,33 @@ $("rulers").onclick = () => { toggle("rulers"); resize(); };
 $("grid").onclick = () => { toggle("grid"); draw(); };
 $("safe").onclick = () => { $("safeFrame").hidden = !toggle("safe"); };
 $("overlayToggle").onclick = () => { toggle("overlayToggle"); draw(); };
+$("markupTools").onclick = () => {
+  const expanded = $("markupPanel").hidden;
+  $("markupTools").setAttribute("aria-expanded", expanded);
+  $("markupPanel").hidden = !expanded;
+  if (expanded) {
+    $("rulers").setAttribute("aria-pressed", "true");
+    $("overlayToggle").setAttribute("aria-pressed", "true");
+    resize();
+  } else setTool("pan");
+};
+function addGuide(axis) {
+  if (!feedback || movableGuides().length >= 50) return;
+  $("rulers").setAttribute("aria-pressed", "true");
+  if (editable()) $("overlayToggle").setAttribute("aria-pressed", "true");
+  const guides = movableGuides();
+  const at = [.5, .25, .75, .33, .67].find((p) => !guides.some((guide) => guide.axis === axis && Math.abs(guide.at - p) < .01)) ?? .5;
+  changeGuides((items) => items.push({ axis, at }));
+  resize();
+  renderFeedback();
+}
+$("horizontalGuide").onclick = () => addGuide("y");
+$("verticalGuide").onclick = () => addGuide("x");
 
 function renderRulers(width, height) {
   const visible = on("rulers");
   $("rulerX").hidden = $("rulerY").hidden = !visible;
-  $("canvasHelp").hidden = !visible || !editable();
+  $("canvasHelp").hidden = !visible;
   if (!visible) return;
   const pixels = 58 / zoom;
   const base = 10 ** Math.floor(Math.log10(pixels));
@@ -696,13 +728,17 @@ function draw() {
   }
   if (on("overlayToggle")) {
     feedback.guides.forEach((guide, index) => {
-      if (gesture?.kind !== "guide" || gesture.index !== index) nodes.push(guideLine(guide, index, w, h));
+      if (!editable()) nodes.push(guideLine(guide, null, w, h));
+      else if (gesture?.kind !== "guide" || gesture.index !== index) nodes.push(guideLine(guide, index, w, h));
     });
-    if (gesture?.kind === "guide") nodes.push(guideLine(gesture.guide, -1, w, h));
     feedback.strokes.forEach((stroke, index) => nodes.push(drawStroke(stroke, w, h, index)));
     if (gesture?.kind === "stroke") nodes.push(drawStroke(gesture.stroke, w, h));
     feedback.notes.forEach((note, index) => nodes.push(pin(note.point, index + 1, w, h, "#80cefa")));
   }
+  temporaryGuides.forEach((guide, index) => {
+    if (gesture?.kind !== "guide" || gesture.index !== index) nodes.push(guideLine(guide, index, w, h));
+  });
+  if (gesture?.kind === "guide") nodes.push(guideLine(gesture.guide, null, w, h));
   overlay.replaceChildren(...nodes);
 }
 function guideLine(guide, index, w, h) {
@@ -711,8 +747,8 @@ function guideLine(guide, index, w, h) {
   const line = guide.axis === "x" ? { x1: x, y1: 0, x2: x, y2: h } : { x1: 0, y1: y, x2: w, y2: y };
   const group = svg("g", {});
   group.append(svg("line", { ...line, stroke: "#00e9ef", "stroke-width": 1, "stroke-dasharray": "6 3", "pointer-events": "none" }));
-  if (editable()) {
-    const handle = svg("line", { ...line, stroke: "transparent", "stroke-width": 13, "data-guide": index });
+  if (index !== null) {
+    const handle = svg("line", { ...line, stroke: "transparent", "stroke-width": 18, "pointer-events": "stroke", "data-guide": index });
     handle.style.cursor = guide.axis === "x" ? "ew-resize" : "ns-resize";
     group.append(handle);
   }
@@ -756,12 +792,13 @@ function startGesture(event) {
   const point = canvasPoint(event);
   const handle = event.target.dataset.guide;
   const ruler = event.target.closest(".ruler");
-  if (editable() && (handle !== undefined || ruler)) {
+  if (handle !== undefined || ruler) {
     const index = handle === undefined ? -1 : Number(handle);
-    if (index < 0 && feedback.guides.length >= 50) return;
-    const axis = feedback.guides[index]?.axis || (ruler.id === "rulerX" ? "y" : "x");
+    const guides = movableGuides();
+    if (index < 0 && guides.length >= 50) return;
+    const axis = guides[index]?.axis || (ruler.id === "rulerX" ? "y" : "x");
     gesture = { kind: "guide", index, guide: { axis, at: point[axis === "x" ? 0 : 1] } };
-    if (!on("overlayToggle")) toggle("overlayToggle");
+    if (editable() && !on("overlayToggle")) toggle("overlayToggle");
   } else if (!editable() || tool === "pan") {
     gesture = { kind: "pan", x: event.clientX, y: event.clientY, left: $("viewport").scrollLeft, top: $("viewport").scrollTop };
   } else if (tool === "note") {
@@ -796,11 +833,14 @@ function finishGesture(event) {
   const result = gesture;
   gesture = null;
   if (event.type === "pointerup" && result.kind === "guide") {
-    const coordinate = canvasPoint(event)[result.guide.axis === "x" ? 0 : 1];
-    const previous = feedback.guides.slice();
-    recordUndo(() => { feedback.guides = previous; });
-    if (result.index >= 0) feedback.guides.splice(result.index, 1);
-    if (coordinate > 0 && coordinate < 1) feedback.guides.push({ ...result.guide, at: coordinate });
+    const point = canvasPoint(event);
+    const inside = point.every((coordinate) => coordinate > 0 && coordinate < 1);
+    if (inside || result.index >= 0) changeGuides((guides) => {
+      const nextGuide = { ...result.guide, at: point[result.guide.axis === "x" ? 0 : 1] };
+      if (result.index < 0) guides.push(nextGuide);
+      else if (inside) guides.splice(result.index, 1, nextGuide);
+      else guides.splice(result.index, 1);
+    });
   }
   if (event.type === "pointerup" && result.kind === "stroke") {
     if (result.stroke.kind !== "pen") result.stroke.points.splice(1, 1, roundedPoint(canvasPoint(event)));
@@ -867,8 +907,11 @@ function renderFeedback() {
       if (editable()) {
         if (kind !== "guides") line.append(button(mark.note || mark.text ? "Edit note" : "Add note", () => editNote(kind, i)));
         line.append(button("Remove", () => {
-          recordUndo(() => feedback[kind].splice(i, 0, mark));
-          marks.splice(i, 1);
+          if (kind === "guides") changeGuides((guides) => guides.splice(i, 1));
+          else {
+            recordUndo(() => feedback[kind].splice(i, 0, mark));
+            marks.splice(i, 1);
+          }
           draw();
           renderFeedback();
         }));
@@ -879,6 +922,16 @@ function renderFeedback() {
     });
   }
   if (!list.children.length) list.append(make("p", editable() ? "Pin a note on the artwork or attach one to a drawing." : "No feedback on this version."));
+  temporaryGuides.forEach((guide, index) => {
+    const row = make("div", "", "mark actions");
+    row.append(make("strong", `Temporary ${guide.axis === "x" ? "vertical" : "horizontal"} guide · ${Math.round(guide.at * 100)}%`),
+      button("Remove", () => {
+        changeGuides((guides) => guides.splice(index, 1));
+        draw();
+        renderFeedback();
+      }));
+    list.append(row);
+  });
   $("undo").disabled = !undoByCreative.get(feedback)?.length;
 }
 

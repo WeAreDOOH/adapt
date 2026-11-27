@@ -107,7 +107,10 @@ with sync_playwright() as driver:
     client.get_by_text("Please check the revised legal line.", exact=True).wait_for()
     assert client.locator("#back").is_hidden()
     client.wait_for_function("document.querySelector('#artwork').naturalWidth === 640")
-    client.locator("#rulers").click()
+    assert client.locator("#drawingTools").is_hidden()
+    client.locator("#markupTools").click()
+    assert client.locator("#drawingTools").is_visible()
+    assert client.locator("#rulerX").is_visible()
     client.locator("#grid").click()
     box = client.locator("#stage").bounding_box()
     x, y = box["x"], box["y"]
@@ -115,7 +118,7 @@ with sync_playwright() as driver:
     client.mouse.down()
     client.mouse.move(x + 50, y + 42, steps=8)
     client.mouse.up()
-    client.get_by_text("Horizontal guide", exact=False).wait_for()
+    client.locator("#feedbackList").get_by_text("Horizontal guide", exact=False).wait_for()
     guide = client.locator("[data-guide]").first
     assert guide.count() == 1
     client.mouse.move(x + 60, y + 42)
@@ -123,6 +126,20 @@ with sync_playwright() as driver:
     client.mouse.move(x + 60, y - 12, steps=6)
     client.mouse.up()
     assert client.locator("[data-guide]").count() == 0
+    client.mouse.move(x - 10, y + 50)
+    client.mouse.down()
+    client.mouse.move(x + 65, y + 50, steps=8)
+    client.mouse.up()
+    client.locator("#feedbackList").get_by_text("Vertical guide", exact=False).wait_for()
+    client.locator("#horizontalGuide").click()
+    assert client.locator("[data-guide]").count() == 2
+    client.locator("#undo").click()
+    assert client.locator("[data-guide]").count() == 1
+    # Close and reopen without discarding the ruler guide or current draft.
+    client.locator("#markupTools").click()
+    assert client.locator("#drawingTools").is_hidden()
+    client.locator("#markupTools").click()
+    assert client.locator("[data-guide]").count() == 1
     client.get_by_role("button", name="Pin note").click()
     client.mouse.click(x + 75, y + 75)
     client.locator("#noteText").fill("Raise the headline into the safe area.")
@@ -141,6 +158,17 @@ with sync_playwright() as driver:
     owner.get_by_role("button", name="Open amendments").click()
     owner.get_by_text("Raise the headline into the safe area.").wait_for()
     owner.get_by_text("Retouch here.").wait_for()
+    owner.locator("#markupTools").click()
+    owner.locator("#markupAccess").wait_for()
+    assert owner.locator("#drawingTools").is_hidden()
+    assert owner.locator("[data-guide]").count() == 0
+    box = owner.locator("#stage").bounding_box()
+    owner.mouse.move(box["x"] + 50, box["y"] - 10)
+    owner.mouse.down()
+    owner.mouse.move(box["x"] + 50, box["y"] + 42, steps=8)
+    owner.mouse.up()
+    owner.get_by_text("Temporary horizontal guide", exact=False).wait_for()
+    assert owner.locator("[data-guide]").count() == 1
     owner.locator("#backWorkspace").click()
     owner.locator("#queue .card").filter(has_text="640 × 360").locator("input[type=file]").set_input_files(
         {"name": "landscape-amended.png", "mimeType": "image/png", "buffer": png(640, 360, (130, 90, 220))})
@@ -181,10 +209,27 @@ with sync_playwright() as driver:
     owner.locator("#submitRound").click()
     owner.locator("#tryReviewer").wait_for()
     assert owner.locator("#emailInvite").is_hidden()
+    practice_link = owner.locator("#inviteLink").input_value()
+    phone = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    touch_reviewer = phone.new_page()
+    touch_reviewer.goto(practice_link)
+    touch_reviewer.locator("#markupTools").click()
+    touch_reviewer.locator("#stage").scroll_into_view_if_needed()
+    phone_box = touch_reviewer.locator("#stage").bounding_box()
+    touch = phone.new_cdp_session(touch_reviewer)
+    start = {"x": phone_box["x"] + 40, "y": phone_box["y"] - 10}
+    end = {"x": start["x"], "y": start["y"] + 65}
+    touch.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [start]})
+    touch.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [end]})
+    touch.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+    assert touch_reviewer.locator("[data-guide]").count() == 1
+    phone.close()
     with owner.context.expect_page() as opened:
         owner.locator("#tryReviewer").click()
     practice_reviewer = opened.value
     practice_reviewer.get_by_text("Practice reviewer", exact=True).wait_for()
+    practice_reviewer.locator("#markupTools").click()
+    practice_reviewer.get_by_role("button", name="Pin note").wait_for()
     practice_reviewer.locator("#comment").fill("Move the headline up.")
     practice_reviewer.locator("#changes").click()
     practice_reviewer.get_by_text("Decision saved.", exact=True).wait_for()

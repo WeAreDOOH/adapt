@@ -51,25 +51,31 @@
             <button id="actual" title="View at original pixel size">100%</button><button id="fullscreen">Full screen</button>
             <button id="rulers" aria-pressed="false">Rulers</button><button id="grid" aria-pressed="false">Grid</button>
             <button id="safe" aria-pressed="false" title="Show a 5% inset guide">Safe area</button>
-            <button id="overlayToggle" aria-pressed="true">Markup</button>
+            <button id="markupTools" aria-expanded="false" aria-controls="markupPanel">Markup</button>
           </div>
-          <div id="drawingTools" class="toolbar drawing" aria-label="Annotation tools">
-            <button data-tool="pan" aria-pressed="true">Pan</button><button data-tool="note" aria-pressed="false">Pin note</button>
-            <button data-tool="pen" aria-pressed="false">Draw</button><button data-tool="arrow" aria-pressed="false">Arrow</button>
-            <button data-tool="box" aria-pressed="false">Box</button>
-            <label>Colour <input type="color" id="colour" value="#ef547d"></label>
-            <label>Brush <select id="brush"><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option></select></label>
-            <button id="undo">Undo</button>
+          <div id="markupPanel" hidden>
+            <div id="drawingTools" class="toolbar drawing" aria-label="Annotation tools">
+              <button data-tool="pan" aria-pressed="true">Pan</button><button data-tool="note" aria-pressed="false">Pin note</button>
+              <button data-tool="pen" aria-pressed="false">Draw</button><button data-tool="arrow" aria-pressed="false">Arrow</button>
+              <button data-tool="box" aria-pressed="false">Box</button>
+              <label>Colour <input type="color" id="colour" value="#ef547d"></label>
+              <label>Brush <select id="brush"><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option></select></label>
+            </div>
+            <div class="toolbar drawing" aria-label="Guide and overlay tools">
+              <button id="horizontalGuide">Add horizontal guide</button><button id="verticalGuide">Add vertical guide</button>
+              <button id="undo">Undo</button><button id="overlayToggle" aria-pressed="true">Show annotations</button>
+            </div>
+            <p class="canvas-help" id="markupAccess" hidden>Submitted markup is read-only here. Guides you add are temporary.</p>
           </div>
           <div id="viewport" tabindex="0" aria-label="Artwork canvas">
             <div id="stage" data-tool="pan">
               <img id="artwork" alt="" draggable="false">
               <svg id="markup" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
               <div id="safeFrame" hidden></div>
-              <div id="rulerX" class="ruler ruler-x" hidden></div><div id="rulerY" class="ruler ruler-y" hidden></div>
+              <div id="rulerX" class="ruler ruler-x" title="Drag down for a horizontal guide" hidden></div><div id="rulerY" class="ruler ruler-y" title="Drag right for a vertical guide" hidden></div>
             </div>
           </div>
-          <p id="canvasHelp" class="canvas-help" hidden>Drag from a ruler to add a guide. Drag a guide past the edge to remove it. Use Pan to move around zoomed artwork.</p>
+          <p id="canvasHelp" class="canvas-help" hidden>Drag down from the top ruler or right from the left ruler to add a guide. Drag a guide outside the artwork to remove it.</p>
         </section>
         <aside class="feedback">
           <div id="artworkerNote" class="notice" hidden><strong>Note from the artworker</strong><p id="artworkerNoteText"></p></div>
