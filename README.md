@@ -13,10 +13,11 @@ view links; the creating browser keeps a separate edit key.
 
 ## Artwork approvals
 
-Save a named plan, then open **Artwork supplied → Open approval queue**. Supply one
-exact-size PNG, JPEG or WebP per size, or use **Stage supplied sizes** to provision
-missing sizes using the planner's current artwork and scaling rules. The flight
-check lists selected versions and omissions, so a queue can be submitted in batches.
+Open **Creative** and save a named plan. Drop exact-size PNG, JPEG or WebP delivery
+files to save originals against their sizes. Reopen Creative to see previews,
+download originals, view markup and find every version. The optional master
+preview tools use the planner's scaling rules to generate and save missing delivery
+sizes. The flight check lists selected versions and omissions for each batch.
 
 Creating a round makes a review link and prepares an email draft for the artworker
 to send. The link allows whoever receives it to see and review only that round's

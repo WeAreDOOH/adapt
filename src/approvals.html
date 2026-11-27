@@ -9,6 +9,7 @@
 </head>
 <body>
   <header class="appbar"><strong class="brand">Adapt<span>.</span></strong><a id="back" hidden>Back to planner</a><span id="role"></span></header>
+  <!-- creative-start -->
   <main>
     <header class="intro">
       <p class="eyebrow" id="kicker">Artwork approvals</p>
@@ -17,7 +18,12 @@
       <p id="status" class="notice" role="status" hidden></p>
     </header>
     <section id="workspace" hidden>
-      <div class="section-head"><div><h2>Artwork supplied</h2><p id="coverage"></p></div><div class="actions"><button id="refresh">Refresh</button><button class="primary" id="flight">Run flight check</button></div></div>
+      <div class="section-head"><div><h2>Saved artwork</h2><p id="coverage"></p></div><div class="actions"><button id="refresh">Refresh</button><button class="primary" id="flight">Run flight check</button></div></div>
+      <div id="deliveryDrop" class="delivery-drop">
+        <div><strong>Drop delivery artwork here</strong><p>PNG, JPEG or WebP · up to 20 MB each. Files that match a plan size are saved as supplied.</p></div>
+        <button id="chooseDelivery" type="button">Choose files</button>
+        <input id="deliveryInput" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+      </div>
       <div id="queueFilters" class="actions filters" aria-label="Filter artwork">
         <button data-filter="all" aria-pressed="true">All sizes</button><button data-filter="draft" aria-pressed="false">Ready to submit</button>
         <button data-filter="changes" aria-pressed="false">Amendments</button><button data-filter="in_review" aria-pressed="false">In review</button>
@@ -35,7 +41,7 @@
         <strong id="position"></strong><span id="decisions"></span>
       </div>
       <nav id="creativeList" class="creative-list" aria-label="Submitted artwork"></nav>
-      <div class="section-head viewer-title"><div><h2 id="creativeTitle"></h2><p id="creativeFile"></p></div><button id="backWorkspace" hidden>Back to queue</button></div>
+      <div class="section-head viewer-title"><div><h2 id="creativeTitle"></h2><p id="creativeFile"></p></div><div class="actions"><a class="button" id="downloadVersion" hidden>Download image</a><button id="backWorkspace" hidden>Back to Creative</button></div></div>
       <div class="review-layout">
         <section id="board" class="board" aria-label="Artwork viewer">
           <div class="toolbar" aria-label="View tools">
@@ -96,5 +102,6 @@
     <h2 id="noteTitle">Canvas note</h2><label class="field">Describe the amendment<textarea id="noteText" rows="4" maxlength="1000" required></textarea></label>
     <div class="actions"><button type="button" data-close="noteDialog">Cancel</button><button class="primary">Save note</button></div>
   </form></dialog>
+  <!-- creative-end -->
 </body>
 </html>

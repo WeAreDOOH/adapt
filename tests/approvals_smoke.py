@@ -32,20 +32,25 @@ with sync_playwright() as driver:
     owner.locator(".szadd").fill("360x640")
     owner.locator(".szadd").press("Enter")
     assert owner.locator("#stNeed").inner_text() == "2"
-    owner.locator("#saveBox summary").click()
-    owner.locator("#planName").fill("Synthetic approval campaign")
-    owner.locator("#savePlan").click()
-    owner.wait_for_url("**/?saved=*")
     owner.locator("#cardArt").click()
-    owner.set_input_files("#artInput", {"name": "landscape.png", "mimeType": "image/png",
-                                        "buffer": png(640, 360, (20, 90, 180))})
-    owner.locator("#artList .artfile.have").wait_for()
-    owner.locator("#stageApprovals").click()
-    owner.get_by_text("1 new size staged.", exact=False).wait_for()
-    owner.locator("#openApprovals").click()
-    owner.wait_for_url("**/approvals?plan=*")
+    owner.locator("#creativePlanName").fill("Synthetic approval campaign")
+    owner.locator("#creativeSave").click()
+    owner.wait_for_url("**/?saved=*&view=creative")
+    original = png(640, 360, (20, 90, 180))
+    owner.locator("#deliveryInput").set_input_files(
+        {"name": "landscape.png", "mimeType": "image/png", "buffer": original})
+    owner.get_by_text("1 image saved to this plan.", exact=True).wait_for()
     owner.get_by_text("1 of 2 sizes supplied", exact=False).wait_for()
-    plan_id = owner.url.split("plan=")[1]
+    owner.reload()
+    owner.get_by_text("1 of 2 sizes supplied", exact=False).wait_for()
+    owner.get_by_role("button", name="Preview 640 × 360 version 1").click()
+    owner.locator("#downloadVersion").wait_for()
+    with owner.expect_download() as download:
+        owner.locator("#downloadVersion").click()
+    assert download.value.path().read_bytes() == original
+    owner.locator("#backWorkspace").click()
+
+    plan_id = owner.url.split("saved=")[1].split("&")[0]
     assert client.request.get(base + "/api/approvals/plans/" + plan_id).status == 403
     assert client.request.get(base + "/api/approvals/review").status == 404
     owner.locator("#queue .card").filter(has_text="360 × 640").locator("input[type=file]").set_input_files(
@@ -129,4 +134,4 @@ with sync_playwright() as driver:
     client.get_by_text("Review unavailable", exact=True).wait_for()
     assert not errors, errors
     browser.close()
-    print("PASS approval loop: scoped artwork, guides, markup, amends, new versions, decision and revocation")
+    print("PASS Creative: saved upload, reload, exact download, scoped review, guides, markup, revisions and revocation")

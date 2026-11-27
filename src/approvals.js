@@ -1,6 +1,7 @@
-const $ = (name) => document.getElementById(name);
-const planId = new URLSearchParams(location.search).get("plan");
-const client = location.pathname === "/client-review";
+export function mountApprovals(root, { planId, client = false, onWorkspace } = {}) {
+const $ = (name) => root.getElementById(name);
+const embedded = root !== document;
+const lifetime = new AbortController();
 const svgNS = "http://www.w3.org/2000/svg";
 const statusNames = {
   empty: "Artwork needed", draft: "Ready to submit", in_review: "In review",
@@ -42,7 +43,7 @@ const ownerPath = "/api/approvals/plans/" + encodeURIComponent(planId ?? "");
 const reviewPath = "/api/approvals/review";
 async function api(url, options = {}) {
   const access = client ? { "X-Adapt-Review-Key": reviewKey } : { "X-Adapt-Plan-Key": ownerKey };
-  const response = await fetch(url, { ...options, headers: { ...access, ...options.headers } });
+  const response = await fetch(url, { signal: lifetime.signal, ...options, headers: { ...access, ...options.headers } });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error || `Adapt could not complete this request (${response.status}).`);
@@ -53,12 +54,12 @@ async function post(url, body, method = "POST") {
   return (await api(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
 }
 async function perform(action, control, errorId = "status") {
-  if (busy) return;
+  if (busy || lifetime.signal.aborted) return;
   busy = true;
   if (control) control.disabled = true;
   setNotice(errorId, "");
   try { await action(); }
-  catch (error) { setNotice(errorId, error.message, true); }
+  catch (error) { if (!lifetime.signal.aborted) setNotice(errorId, error.message, true); }
   finally {
     if (control) control.disabled = false;
     busy = false;
@@ -76,9 +77,12 @@ async function loadWorkspace() {
     markedVersions.add(key);
   }
   renderWorkspace();
+  onWorkspace?.(workspace);
 }
 
 function renderWorkspace() {
+  thumbnailObserver.disconnect();
+  thumbnailQueue.length = 0;
   const formats = workspace.formats;
   const supplied = formats.filter((f) => f.versions.length).length;
   const amends = formats.filter((f) => f.versions[0]?.status === "changes").length;
@@ -100,6 +104,7 @@ function formatCard(row, archived) {
   identity.append(make("h3", prettySize(row.size) + " px"), badge(version?.status || "empty"));
   if (version) identity.append(make("p", `Version ${version.number} · ${version.filename}`));
   card.append(identity);
+  if (version) card.append(thumbnail(row, version));
   if (version?.status === "draft" && !archived) {
     const label = make("label", "", "check");
     const check = make("input");
@@ -150,20 +155,114 @@ function formatCard(row, archived) {
 }
 
 async function uploadArtwork(size, file) {
+  const dimensions = await readDimensions(file);
+  if (size !== dimensions) throw new Error(`Expected ${prettySize(size)} px. This file is ${prettySize(dimensions)} px.`);
+  return storeArtwork(dimensions, file);
+}
+
+async function readDimensions(file) {
   if (file.size > 20_000_000) throw new Error("Artwork must be under 20 MB.");
   const url = URL.createObjectURL(file);
   const image = new Image();
   try {
     image.src = url;
     await image.decode().catch(() => { throw new Error("Adapt could not read this image."); });
-    if (size !== `${image.naturalWidth}x${image.naturalHeight}`) {
-      throw new Error(`Expected ${prettySize(size)} px. This file is ${image.naturalWidth} × ${image.naturalHeight} px.`);
-    }
+    return `${image.naturalWidth}x${image.naturalHeight}`;
   } finally { URL.revokeObjectURL(url); }
+}
+
+async function storeArtwork(size, file) {
   return api(ownerPath + "/artwork/" + size, {
     method: "POST", body: file,
     headers: { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(file.name) },
   });
+}
+
+function addDeliveries(files) {
+  if (!files.length) return;
+  perform(async () => {
+    const formats = new Map(workspace.formats.map((format) => [format.size, format]));
+    const seen = new Set();
+    const issues = [];
+    let saved = 0;
+    for (const file of files) {
+      setNotice("status", "Saving " + file.name + "…");
+      try {
+        const size = await readDimensions(file);
+        if (!formats.has(size)) throw new Error(`${prettySize(size)} px isn’t in this plan.`);
+        if (seen.has(size)) throw new Error("Another file for this size was already saved in this batch.");
+        await storeArtwork(size, file);
+        seen.add(size);
+        saved++;
+      } catch (error) { issues.push(file.name + " — " + error.message); }
+    }
+    if (saved) await loadWorkspace();
+    setNotice("status", `${saved} image${saved === 1 ? "" : "s"} saved to this plan.` +
+      (issues.length ? " " + issues.join(" ") : ""), !!issues.length);
+  }, $("chooseDelivery"));
+}
+$("chooseDelivery").onclick = () => $("deliveryInput").click();
+$("deliveryInput").onchange = (event) => {
+  addDeliveries([...event.target.files]);
+  event.target.value = "";
+};
+$("deliveryDrop").ondragover = (event) => {
+  if (!event.dataTransfer.types.includes("Files")) return;
+  event.preventDefault();
+  $("deliveryDrop").classList.add("dragging");
+};
+$("deliveryDrop").ondragleave = (event) => {
+  if (!$("deliveryDrop").contains(event.relatedTarget)) $("deliveryDrop").classList.remove("dragging");
+};
+$("deliveryDrop").ondrop = (event) => {
+  event.preventDefault();
+  $("deliveryDrop").classList.remove("dragging");
+  addDeliveries([...event.dataTransfer.files]);
+};
+
+const thumbnailQueue = [];
+let thumbnailRequests = 0;
+const thumbnailObserver = new IntersectionObserver((entries) => {
+  for (const { target, isIntersecting } of entries) {
+    if (!isIntersecting) continue;
+    thumbnailObserver.unobserve(target);
+    thumbnailQueue.push(target);
+  }
+  loadThumbnails();
+});
+function thumbnail(row, version) {
+  const thumb = button("", () => openOwnerVersion(row, version));
+  thumb.className = "thumb";
+  thumb.setAttribute("aria-label", `Preview ${prettySize(row.size)} version ${version.number}`);
+  const canvas = make("canvas");
+  canvas.width = 200;
+  canvas.height = 128;
+  canvas.dataset.version = version.id;
+  canvas.dataset.size = row.size;
+  thumb.append(canvas);
+  thumbnailObserver.observe(canvas);
+  return thumb;
+}
+function loadThumbnails() {
+  while (!lifetime.signal.aborted && thumbnailRequests < 2 && thumbnailQueue.length) {
+    const canvas = thumbnailQueue.shift();
+    if (!canvas.isConnected) continue;
+    thumbnailRequests++;
+    drawThumbnail(canvas).catch(() => {}).finally(() => {
+      thumbnailRequests--;
+      loadThumbnails();
+    });
+  }
+}
+async function drawThumbnail(canvas) {
+  const response = await api(ownerPath + "/versions/" + canvas.dataset.version + "/image", { signal: lifetime.signal });
+  const [w, h] = canvas.dataset.size.split("x").map(Number);
+  const scale = Math.min(canvas.width / w, canvas.height / h);
+  const width = Math.max(1, Math.round(w * scale));
+  const height = Math.max(1, Math.round(h * scale));
+  const bitmap = await createImageBitmap(await response.blob(), { resizeWidth: width, resizeHeight: height });
+  try { canvas.getContext("2d").drawImage(bitmap, (canvas.width - width) / 2, (canvas.height - height) / 2); }
+  finally { bitmap.close(); }
 }
 
 function roundCard(round) {
@@ -231,11 +330,11 @@ $("copyInvite").onclick = async () => {
   } catch { $("copyInvite").textContent = "Link selected"; }
 };
 $("refresh").onclick = () => perform(loadWorkspace, $("refresh"));
-document.querySelectorAll("[data-close]").forEach((control) => { control.onclick = () => $(control.dataset.close).close(); });
-document.querySelectorAll("[data-filter]").forEach((control) => {
+root.querySelectorAll("[data-close]").forEach((control) => { control.onclick = () => $(control.dataset.close).close(); });
+root.querySelectorAll("[data-filter]").forEach((control) => {
   control.onclick = () => {
     filter = control.dataset.filter;
-    document.querySelectorAll("[data-filter]").forEach((item) => item.setAttribute("aria-pressed", item === control));
+    root.querySelectorAll("[data-filter]").forEach((item) => item.setAttribute("aria-pressed", item === control));
     renderWorkspace();
     control.focus();
   };
@@ -295,6 +394,7 @@ async function display(item, imagePath) {
   $("creativeList").hidden = !client;
   $("creativeTitle").textContent = `${prettySize(item.size)} px · Version ${item.number}`;
   $("creativeFile").textContent = item.filename;
+  $("downloadVersion").hidden = true;
   $("decisionBadge").replaceChildren(item.decision ? badge(item.decision) : make("span", client ? "Awaiting review" : ""));
   $("decisionControls").hidden = !editable();
   $("changes").disabled = $("approve").disabled = true;
@@ -313,6 +413,11 @@ async function display(item, imagePath) {
   const blob = await (await api(imagePath)).blob();
   if (ticket !== generation) return;
   imageUrl = URL.createObjectURL(blob);
+  if (!client) {
+    $("downloadVersion").href = imageUrl;
+    $("downloadVersion").download = item.filename;
+    $("downloadVersion").hidden = false;
+  }
   $("artwork").src = imageUrl;
   $("artwork").alt = "Artwork for " + prettySize(item.size);
   await $("artwork").decode().catch(() => {
@@ -330,6 +435,8 @@ function recordUndo(action) {
 }
 $("backWorkspace").onclick = () => {
   generation++;
+  if (imageUrl) URL.revokeObjectURL(imageUrl);
+  imageUrl = null;
   $("viewer").hidden = true;
   $("workspace").hidden = false;
 };
@@ -402,8 +509,9 @@ $("fullscreen").onclick = async () => {
 document.addEventListener("fullscreenchange", () => {
   $("fullscreen").textContent = document.fullscreenElement ? "Exit full screen" : "Full screen";
   resize();
-});
-new ResizeObserver(resize).observe($("viewport"));
+}, { signal: lifetime.signal });
+const viewportObserver = new ResizeObserver(resize);
+viewportObserver.observe($("viewport"));
 $("rulers").onclick = () => { toggle("rulers"); resize(); };
 $("grid").onclick = () => { toggle("grid"); draw(); };
 $("safe").onclick = () => { $("safeFrame").hidden = !toggle("safe"); };
@@ -431,13 +539,13 @@ function renderRulers(width, height) {
 function setTool(value) {
   tool = value;
   $("stage").dataset.tool = tool;
-  for (const control of document.querySelectorAll("button[data-tool]")) {
+  for (const control of root.querySelectorAll("button[data-tool]")) {
     control.setAttribute("aria-pressed", control.dataset.tool === value);
   }
   if (value !== "pan" && !on("overlayToggle")) toggle("overlayToggle");
   draw();
 }
-document.querySelectorAll("button[data-tool]").forEach((control) => { control.onclick = () => setTool(control.dataset.tool); });
+root.querySelectorAll("button[data-tool]").forEach((control) => { control.onclick = () => setTool(control.dataset.tool); });
 $("viewport").addEventListener("keydown", (event) => {
   if (client && ["[", "]"].includes(event.key)) openClientPosition(position + (event.key === "]" ? 1 : -1));
   if (event.key === "+") $("zoomIn").click();
@@ -654,9 +762,11 @@ async function initialise() {
     $("role").textContent = "Client reviewer";
     return openReview();
   }
-  $("role").textContent = "Artworker";
-  $("back").href = planId ? "/?saved=" + encodeURIComponent(planId) : "/";
-  $("back").hidden = false;
+  if (!embedded) {
+    $("role").textContent = "Artworker";
+    $("back").href = planId ? "/?saved=" + encodeURIComponent(planId) + "&view=creative" : "/";
+    $("back").hidden = false;
+  }
   try {
     ownerKey = JSON.parse(localStorage.getItem("adapt-owned-plans") || "[]")
       .find((p) => p.id === planId)?.editKey || "";
@@ -693,9 +803,29 @@ async function openReview() {
 }
 
 function showUnavailable(error) {
+  if (lifetime.signal.aborted) return;
   $("title").textContent = client ? "Review unavailable" : "Approval workspace unavailable";
   $("intro").textContent = "";
   setNotice("status", error.message, true);
 }
-if (client) window.addEventListener("hashchange", () => { if (location.hash) openReview().catch(showUnavailable); });
-initialise().catch(showUnavailable);
+if (client) window.addEventListener("hashchange", () => { if (location.hash) openReview().catch(showUnavailable); }, { signal: lifetime.signal });
+const ready = initialise().catch(showUnavailable);
+return {
+  ready,
+  refresh: () => perform(loadWorkspace),
+  destroy() {
+    lifetime.abort();
+    generation++;
+    viewportObserver.disconnect();
+    thumbnailObserver.disconnect();
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
+  },
+};
+}
+
+if (document.getElementById("role")) {
+  mountApprovals(document, {
+    planId: new URLSearchParams(location.search).get("plan"),
+    client: location.pathname === "/client-review",
+  });
+}

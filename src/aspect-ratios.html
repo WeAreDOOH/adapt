@@ -438,6 +438,9 @@ button.linkish:hover{text-decoration:underline;background:none}
 .auditbox{border:1px solid var(--line);border-radius:4px;padding:12px}.auditbox h3{margin:0 0 8px;font-size:.9rem}.auditbox ul{margin:0;padding-left:20px}.auditbox li{margin:5px 0;font-size:.82rem}.auditbox li.critical,.auditbox li.warning{color:var(--warn)}
 .reviewfoot{position:sticky;bottom:0;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 20px;background:var(--panel);border-top:1px solid var(--line)}
 .savedlist{display:grid;gap:6px;margin-top:10px}.saveditem{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:5px;align-items:center}.saveditem button{height:26px;padding:0 8px;font-size:.68rem}.saveditem .savedname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem}
+.creative-gate{padding:14px;border:1px solid var(--line);border-radius:5px;background:var(--raised);margin:12px 0}
+#creativeMasters{margin-top:16px}
+#creativeMasters > summary{cursor:pointer;margin-bottom:12px}
 .filecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;align-items:stretch}
 .fcard{background:var(--raised);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .fcard.have{border-left-color:var(--muted)}
@@ -657,7 +660,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     <div class="stat primary" role="tab" id="cardSizes" aria-controls="paneSizes" aria-selected="false" tabindex="-1" data-view="sizes"><div class="tile" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg></div><div class="lbl">Sizes</div><div class="num" id="stSizes">0</div></div>
     <div class="stat" role="tab" id="cardRatios" aria-controls="paneRatios" aria-selected="false" tabindex="-1" data-view="ratios"><div class="tile" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6" width="19" height="12" rx="1.5"/><path d="M6 9v3M6 9h3M18 15v-3M18 15h-3"/></svg></div><div class="lbl">Unique ratios</div><div class="num" id="stRatios">0</div></div>
     <div class="stat" id="stFilesCard" role="tab" aria-controls="paneSpec" aria-selected="true" tabindex="0" data-view="spec"><div class="tile" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8l-5-5z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg></div><div class="lbl">Files to create</div><div class="num"><span class="delta" id="stDelta" aria-hidden="true"></span><span id="stNeed">0</span></div><div class="note" id="stArtNote"></div><span id="stArt" hidden></span></div>
-    <div class="stat" role="tab" id="cardArt" aria-controls="paneArt" aria-selected="false" tabindex="-1" data-view="art"><div class="tile" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg></div><div class="lbl">Artwork supplied</div><div class="num" id="stArtSup">0</div></div>
+    <div class="stat" role="tab" id="cardArt" aria-controls="paneArt" aria-selected="false" tabindex="-1" data-view="art"><div class="tile" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg></div><div class="lbl">Creative</div><div class="num" id="stArtSup">0</div></div>
   </div>
 
   <div class="grid" id="mainGrid">
@@ -731,21 +734,32 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
 
     <section class="panel results" aria-label="Results">
       <div id="paneArt" role="tabpanel" aria-labelledby="cardArt" hidden>
-        <div class="pane-head"><h2 class="pane-title">Artwork</h2>
+        <div class="pane-head"><h2 class="pane-title">Creative</h2></div>
+        <div class="creative-gate" id="creativeGate">
+          <p class="help" id="creativeGateText" role="status">Save a plan to upload and keep its artwork.</p>
+          <div class="openrow" id="creativeSaveRow"><input id="creativePlanName" maxlength="120" placeholder="Campaign or project name" aria-label="Creative plan name"><button type="button" class="primary" id="creativeSave">Save plan</button></div>
+        </div>
+        <div id="creativeHost" hidden></div>
+        <template id="creativeTemplate">
+          <link rel="stylesheet" href="/approvals.css">
+          <!-- embed-creative-workspace -->
+        </template>
+        <details class="artbox" id="creativeMasters">
+        <summary>Adapt artwork from master files</summary>
+        <div class="pane-head"><h3 class="pane-title">Master previews</h3>
           <div class="row" style="margin:0"><label class="tlpick" title="Default tramline colour, used by every file without its own">Default tramlines <input type="color" id="tlColor2" value="#000000" aria-label="Tramline colour"></label><button type="button" class="pickbtn" data-pick title="Pick a colour from your artwork" aria-label="Pick a tramline colour from your artwork"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14.5 5.5l4 4M17 3l4 4-3 3-4-4 3-3zM14 6L5 15l-1 5 5-1 9-9"/></svg></button><button type="button" id="safeBtn" class="toggle" aria-pressed="true">Safe area</button><button type="button" class="primary" id="dlSizes" hidden aria-label="Download all sizes"><svg class="bi" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>All sizes</button></div></div>
         <div class="aiimport" style="margin:0 0 14px">
-          <h3>Artwork approvals</h3>
-          <p class="help">Send exact-size artwork for client review, track amends and keep each version. Save a named plan to start its approval queue.</p>
-          <div class="row"><button type="button" class="primary" id="openApprovals">Open approval queue</button><button type="button" id="stageApprovals">Stage supplied sizes</button></div>
+          <p class="help">Preview a master across its sizes, then save the generated delivery files to Creative. Master previews are temporary.</p>
+          <div class="row"><button type="button" id="stageApprovals">Save generated sizes</button></div>
           <p class="aistatus" id="approvalStatus" role="status" hidden></p>
         </div>
-        <p class="help" style="margin:0 0 12px">Drop finished artwork to see it in every size it covers. Files are matched by their dimensions. These previews stay on this device until you stage them for approvals.</p>
         <label class="dropzone" id="dropZone"><input type="file" id="artInput" accept="image/png,image/jpeg,image/webp" multiple class="sr">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
           <span><b>Drop artwork here</b> or <u>choose files</u></span><span class="hint">PNG, JPG or WebP</span></label>
         <div class="artprog" id="artProg"><div class="bar"><i id="artBar"></i></div><p id="artProgText"></p></div>
         <div id="artLoose"></div>
         <div id="artList"></div>
+        </details>
       </div>
       <div id="paneSizes" role="tabpanel" aria-labelledby="cardSizes" hidden>
         <div class="pane-head"><h2 class="pane-title">Every size you entered</h2>
@@ -1212,8 +1226,16 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     const map={art:['cardArt','paneArt'],sizes:['cardSizes','paneSizes'],ratios:['cardRatios','paneRatios'],spec:['stFilesCard','paneSpec']};
     Object.entries(map).forEach(([k,[c,pn]])=>{const on=k===which;$(c).setAttribute('aria-selected',on);$(c).tabIndex=on?0:-1;$(pn).hidden=!on;});
     const wide=window.matchMedia('(min-width:1100px)').matches,open=!$('mainGrid').classList.contains('collapsed');
-    if(which==='ratios'&&wide&&open){setTools(false,false,true);autoFolded=true;}
-    else if(which!=='ratios'&&autoFolded){setTools(true,false,true);autoFolded=false;}
+    const workspaceView=which==='ratios'||(which==='art'&&!!creativeOwner());
+    if(workspaceView&&wide&&open){setTools(false,false,true);autoFolded=true;}
+    else if(!workspaceView&&autoFolded){setTools(true,false,true);autoFolded=false;}
+    if(currentSavedId){
+      const url=new URL(location.href);
+      if(which==='art')url.searchParams.set('view','creative');
+      else url.searchParams.delete('view');
+      history.replaceState(null,'',url);
+    }
+    if(which==='art')syncCreative();
   }
   function setFilter(keys,label){
     filterKeys.clear();keys.forEach(k=>filterKeys.add(k));filterLabel=label||'';
@@ -1565,12 +1587,12 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   }
   const planFrom=text=>{const m=String(text).match(/[#?&]plan=([A-Za-z0-9_-]+)/)||String(text).trim().match(/^([zj][A-Za-z0-9_-]{8,})$/);return m?m[1]:null;};
   async function openPlan(code,fromLink){
-    try{const st=await decodePlan(code);applyState(st);currentSavedId='';$('planName').value='';$('shareSaved').hidden=true;$('savedStatus').textContent='';$('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();toast(fromLink?'Opened the shared plan':'Plan opened');return true;}
+    try{const st=await decodePlan(code);if(currentSavedId)resetCreativeProject();applyState(st);currentSavedId='';$('planName').value='';$('shareSaved').hidden=true;$('savedStatus').textContent='';$('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();if(!$('paneArt').hidden)syncCreative();toast(fromLink?'Opened the shared plan':'Plan opened');return true;}
     catch(e){toast('That link doesn\'t contain a readable plan');return false;}
   }
   $('shareBtn').onclick=async()=>{
     const code=await encodePlan(getState());
-    const base=new URL(location.href);base.hash='';base.searchParams.delete('saved');
+    const base=new URL(location.href);base.hash='';base.searchParams.delete('saved');base.searchParams.delete('view');
     copy(base+'#plan='+code,'Link copied. Anyone you send it to also needs access to this page.');
   };
   $('planOpen').onclick=()=>{const c=planFrom($('planIn').value);if(!c){toast('Paste a link that ends in #plan=…');return;}openPlan(c,false).then(ok=>{if(ok){$('planIn').value='';$('openBox').open=false;}});};
@@ -1584,16 +1606,21 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   function renderOwnedPlans(){const rows=ownedPlans();$('savedList').innerHTML=rows.length?rows.map(x=>'<div class="saveditem"><span class="savedname" title="'+esc(x.name)+'">'+esc(x.name)+'</span><button type="button" data-open-saved="'+esc(x.id)+'">Open</button><button type="button" data-share-saved="'+esc(x.id)+'">Share</button></div>').join(''):'<span class="hint">No named plans saved in this browser yet.</span>';}
   async function openSavedPlan(id,fromLink){
     try{const r=await fetch('/api/plans/'+encodeURIComponent(id),{headers:{Accept:'application/json'}}),data=await r.json();if(!r.ok)throw new Error(data.error||'Plan not found');
+      if(currentSavedId!==data.id)resetCreativeProject();
       applyState(data.plan);currentSavedId=data.id;savedPlanSizes=data.plan.sizes;$('planName').value=data.name;$('saveBox').open=true;$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
-      $('restored').hidden=true;$('sharedNote').hidden=false;renderGrid();render();toast(fromLink?'Opened the saved plan':'Plan opened');return true;
+      const creative=new URLSearchParams(location.search).get('view')==='creative'||!$('paneArt').hidden;
+      history.replaceState(null,'',savedLink(data.id)+(creative?'&view=creative':''));
+      $('restored').hidden=true;$('sharedNote').hidden=!!creativeOwner();renderGrid();render();if(creative)showTab('art');toast(fromLink?'Opened the saved plan':'Plan opened');return true;
     }catch(e){toast(e.message||'That saved plan could not be opened');return false;}}
-  $('savePlan').onclick=async()=>{
-    const name=$('planName').value.trim();if(!name){$('planName').focus();toast('Give the plan a name');return;}
+  async function saveCurrentPlan(name){
     const owned=ownedPlans().find(x=>x.id===currentSavedId&&x.editKey),updating=!!owned;
     const btn=$('savePlan');btn.disabled=true;$('savedStatus').textContent=updating?'Updating…':'Saving…';
     try{const r=await fetch(updating?'/api/plans/'+currentSavedId:'/api/plans',{method:updating?'PUT':'POST',headers:{'Content-Type':'application/json',...(updating?{'X-Adapt-Plan-Key':owned.editKey}:{})},body:JSON.stringify({name,plan:getState()})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Plan could not be saved');
-      currentSavedId=data.id;savedPlanSizes=data.plan.sizes;rememberOwned({...data,editKey:data.editKey||owned?.editKey});$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();history.replaceState(null,'',location.pathname+'?saved='+data.id);toast(updating?'Plan updated':'Plan saved');
-    }catch(e){$('savedStatus').textContent=e.message||'Plan could not be saved';toast('Plan not saved');}finally{btn.disabled=false;}};
+      currentSavedId=data.id;savedPlanSizes=data.plan.sizes;$('planName').value=data.name;rememberOwned({...data,editKey:data.editKey||owned?.editKey});$('shareSaved').hidden=false;$('savedStatus').textContent='Saved '+new Date(data.updatedAt).toLocaleString();
+      const creative=!$('paneArt').hidden;history.replaceState(null,'',savedLink(data.id)+(creative?'&view=creative':''));
+      if(creative)await syncCreative();toast(updating?'Plan updated':'Plan saved');return true;
+    }catch(e){$('savedStatus').textContent=e.message||'Plan could not be saved';toast('Plan not saved');return false;}finally{btn.disabled=false;}}
+  $('savePlan').onclick=()=>{const name=$('planName').value.trim();if(name)saveCurrentPlan(name);else{$('planName').focus();toast('Give the plan a name');}};
   $('shareSaved').onclick=()=>{if(currentSavedId)copy(savedLink(currentSavedId),'Saved plan link copied. Anyone with the link can open a copy.');};
   $('savedList').onclick=e=>{const open=e.target.closest('[data-open-saved]'),share=e.target.closest('[data-share-saved]');if(open)openSavedPlan(open.dataset.openSaved,false);if(share)copy(savedLink(share.dataset.shareSaved),'Saved plan link copied.');};
   renderOwnedPlans();
@@ -1977,7 +2004,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     // artwork whose file left the plan goes back to the loose tray
     [...artMap.keys()].forEach(k=>{if(!rows.some(r=>r.F.label===k)){artLoose.push(artMap.get(k));artMap.delete(k);}});
     const sizesTotal=rows.reduce((t,r)=>t+r.fm.reduce((u,x)=>u+x.z.count,0),0),sizesDone=have.reduce((t,r)=>t+r.fm.reduce((u,x)=>u+x.z.count,0),0);
-    $('stArtSup').textContent=rows.length?have.length+' / '+rows.length:'0';
+    if(!creativeApp)$('stArtSup').textContent=rows.length?have.length+' / '+rows.length:'0';
     $('artBar').style.width=(rows.length?100*have.length/rows.length:0)+'%';
     $('artProgText').textContent=!rows.length?'Add some sizes first.':have.length===rows.length?'All '+rows.length+' files supplied, covering all '+sizesTotal+' sizes.':
       have.length+' of '+rows.length+' files supplied, covering '+sizesDone+' of '+sizesTotal+' sizes. Still needed: '+rows.filter(r=>!artMap.has(r.F.label)).map(r=>r.F.label).join(', ')+'.';
@@ -2008,59 +2035,133 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
       if(a&&z){const box=cv.parentElement;drawFit(cv,a,r,z.z,parseFloat(box.style.width),parseFloat(box.style.height));}});
   }
   $('artInput').addEventListener('change',e=>{addFiles([...e.target.files]);e.target.value='';});
-  // Carry the planner's unique sizes and exact artwork renders into a private approval workspace.
-  async function prepareApprovals(stage) {
+  let creativeApp, creativeIdentity, creativeLoad, creativeGeneration=0;
+  function clearCreativeWorkspace(){
+    creativeGeneration++;
+    creativeApp?.destroy();
+    creativeApp=creativeIdentity=creativeLoad=null;
+    $('creativeHost').shadowRoot?.replaceChildren();
+    $('creativeHost').hidden=true;
+  }
+  function resetCreativeProject(){
+    clearCreativeWorkspace();
+    for(const art of [...artMap.values(),...artLoose])URL.revokeObjectURL(art.url);
+    artMap.clear();
+    artLoose=[];
+  }
+  function creativeOwner(){
+    return ownedPlans().find((entry)=>entry.id===currentSavedId&&entry.editKey);
+  }
+  function updateCreativeGate(){
+    const owns=creativeOwner();
+    const dirty=!!owns&&savedPlanSizes!==input.value;
+    const gate=$('creativeGate');
+    gate.hidden=!!creativeApp&&!dirty;
+    $('creativeSaveRow').hidden=!!owns&&!dirty;
+    $('creativeSave').textContent=dirty?'Save size changes':'Save plan';
+    $('creativePlanName').hidden=dirty;
+    if(dirty)$('creativeGateText').textContent='Save the current size list to update the Creative queue.';
+    else if(!owns)$('creativeGateText').textContent=currentSavedId
+      ?'Save a copy of this plan to start your own Creative queue.'
+      :'Name this plan to save your artwork and approval history.';
+    else if(!creativeApp)$('creativeGateText').textContent='Loading saved artwork…';
+  }
+  async function creativeRequest(owns, endpoint, options){
+    const response=await fetch('/api/approvals/plans/'+owns.id+endpoint,{
+      ...options,headers:{...options.headers,'X-Adapt-Plan-Key':owns.editKey},
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.error||'Adapt could not save the artwork ('+response.status+').');
+    return result;
+  }
+  async function syncCreative(){
+    if(location.protocol==='file:'){$('creativeGate').hidden=true;$('creativeMasters').open=true;return;}
+    const owns=creativeOwner();
+    updateCreativeGate();
+    if(!owns)return;
+    const identity=owns.id+'\n'+savedPlanSizes;
+    if(creativeIdentity===identity){
+      if(creativeApp)await creativeApp.refresh();
+      return creativeLoad;
+    }
+    clearCreativeWorkspace();
+    creativeIdentity=identity;
+    const generation=creativeGeneration;
+    creativeLoad=(async()=>{
+      const dimensions=parse(savedPlanSizes).items;
+      const bySize=new Map(dimensions.filter(({w,h})=>Number.isInteger(w)&&Number.isInteger(h)&&w<=30000&&h<=30000)
+        .map(({w,h})=>[w+'x'+h,{width:w,height:h}]));
+      try{
+        const {mountApprovals}=await import('/approvals.js');
+        if(generation!==creativeGeneration)return;
+        await creativeRequest(owns,'/formats',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({formats:[...bySize.values()]})});
+        if(generation!==creativeGeneration)return;
+        const host=$('creativeHost');
+        const root=host.shadowRoot||host.attachShadow({mode:'open'});
+        root.replaceChildren($('creativeTemplate').content.cloneNode(true));
+        host.hidden=false;
+        creativeApp=mountApprovals(root,{planId:owns.id,onWorkspace(workspace){
+          if(generation!==creativeGeneration)return;
+          $('stArtSup').textContent=workspace.formats.filter((size)=>size.versions.length).length+' / '+workspace.formats.length;
+        }});
+        await creativeApp.ready;
+        if(generation===creativeGeneration)updateCreativeGate();
+      }catch(error){
+        if(generation!==creativeGeneration)return;
+        creativeIdentity=null;
+        $('creativeGateText').textContent=error.message;
+      }
+    })();
+    return creativeLoad;
+  }
+  $('creativeSave').onclick=async()=>{
+    if(!allTargets.length){toast('Add at least one size to the plan first.');return;}
+    const name=(creativeOwner()?$('planName').value:$('creativePlanName').value).trim();
+    if(!name){$('creativePlanName').focus();toast('Give the plan a name');return;}
+    const control=$('creativeSave');control.disabled=true;
+    try{
+      if(!await saveCurrentPlan(name))$('creativeGateText').textContent=$('savedStatus').textContent;
+    }finally{control.disabled=false;}
+  };
+  $('creativePlanName').addEventListener('keydown',(event)=>{if(event.key==='Enter')$('creativeSave').click();});
+
+  // Save derived delivery images with the same placement rules used by the previews.
+  async function saveGeneratedSizes() {
     const owns = ownedPlans().find((entry) => entry.id === currentSavedId && entry.editKey);
     if (!owns || savedPlanSizes !== input.value) {
-      showTab('spec');
-      setTools(true, false);
-      $('saveBox').open = true;
-      $('planName').focus();
-      toast(owns ? 'Save your size changes before opening the approval queue.' : 'Save this plan first to create an approval queue.');
+      updateCreativeGate();
+      $('creativeSave').focus();
+      toast(owns ? 'Save your size changes first.' : 'Save the plan first.');
       return;
     }
     if (!allTargets.length) {
       toast('Add the required sizes before starting approvals.');
       return;
     }
-    const base = '/api/approvals/plans/' + owns.id;
     const status = $('approvalStatus');
-    const controls = [$('openApprovals'), $('stageApprovals')];
-    const pathname = '/approvals?plan=' + owns.id;
-    const formats = allTargets.map(({w, h}) => ({ width: w, height: h }));
+    const control = $('stageApprovals');
     const settings = { up: $('allowUp').checked, down: $('allowDown').checked, float: $('floatOn').checked };
     const artwork = specRows.flatMap((row) => {
       const source = artMap.get(row.F.label);
       return source ? row.fm.map(({z}) => ({row, source, size: z, placement: artPlace(source, row, z), colour: colorFor(row)})) : [];
     });
-    if (stage && !artwork.length) {
+    if (!artwork.length) {
       toast('Supply artwork in this tab before staging it.');
       return;
     }
-    async function request(url, options) {
-      const response = await fetch(base + url, {
-        ...options, headers: { ...options.headers, 'X-Adapt-Plan-Key': owns.editKey },
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Adapt could not stage the artwork (' + response.status + ').');
-      return result;
-    }
-    controls.forEach((control) => {control.disabled = true;});
+    control.disabled = true;
     status.hidden = false;
     status.textContent = 'Preparing the approval queue…';
     try {
-      const workspace = await request('/formats', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({formats})});
-      if (!stage) {
-        location.assign(pathname);
-        return;
-      }
+      await syncCreative();
+      const workspace = await creativeRequest(owns,'',{});
       const missing = new Set(workspace.formats.filter((format) => !format.versions.length).map((format) => format.size));
       const ready = artwork.filter(({size}) => missing.has(size.w + 'x' + size.h));
       let added = 0;
       const skipped = [];
       for (const {row, source, size, placement, colour} of ready) {
         const key = size.w + 'x' + size.h;
-        status.textContent = 'Staging ' + size.label + '…';
+        status.textContent = 'Saving ' + size.label + '…';
         try {
           const exact = source.w === size.w && source.h === size.h;
           if (!exact && ((!settings.up && placement.s > 1.001) || (!settings.down && placement.s < .999) ||
@@ -2078,19 +2179,19 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
             if (!blob) throw new Error('the preview could not be rendered');
             name = key + '.png';
           }
-          await request('/artwork/' + key, {method: 'POST', body: blob, headers: {
+          await creativeRequest(owns,'/artwork/' + key, {method: 'POST', body: blob, headers: {
             'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(name), 'X-Adapt-Initial-Artwork': '1',
           }});
           added++;
         } catch (error) { skipped.push(size.label + ' – ' + error.message); }
       }
-      status.textContent = added + ' new size' + (added === 1 ? '' : 's') + ' staged. Existing artwork stays in the queue.' +
+      if(creativeOwner()?.id===owns.id)await creativeApp?.refresh();
+      status.textContent = added + ' generated size' + (added === 1 ? '' : 's') + ' saved to Creative.' +
         (skipped.length ? ' Needs attention: ' + skipped.join(' · ') : '');
     } catch (error) { status.textContent = error.message; }
-    finally { controls.forEach((control) => {control.disabled = false;}); }
+    finally { control.disabled = false; }
   }
-  $('openApprovals').onclick = () => prepareApprovals(false);
-  $('stageApprovals').onclick = () => prepareApprovals(true);
+  $('stageApprovals').onclick = saveGeneratedSizes;
   // redraw one file's previews in place, so a colour picker stays open while you drag
   function redrawFile(label){const r=specRows.find(x=>x.F.label===label),a=artMap.get(label);if(!r||!a)return;
     $('artList').querySelectorAll('canvas[data-f]').forEach(cv=>{if(cv.dataset.f!==label)return;const z=r.fm.find(x=>x.z.label===cv.dataset.z);
@@ -2175,7 +2276,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
   $('artLoose').addEventListener('click',e=>{const b=e.target.closest('[data-unloose]');if(b){const a=artLoose[+b.dataset.unloose];if(a)URL.revokeObjectURL(a.url);artLoose.splice(+b.dataset.unloose,1);renderArt();}});
   $('safeBtn').onclick=()=>{safeOn=!safeOn;$('safeBtn').setAttribute('aria-pressed',safeOn);renderArt();};
   // drag and drop: anywhere on the pane, or onto one file to assign it directly
-  const pane=$('paneArt');
+  const pane=$('creativeMasters');
   pane.addEventListener('dragover',e=>{if(![...e.dataTransfer.types].includes('Files'))return;e.preventDefault();
     pane.querySelectorAll('.drag').forEach(x=>x.classList.remove('drag'));(e.target.closest('.artfile')||$('dropZone')).classList.add('drag');});
   pane.addEventListener('dragleave',e=>{if(!pane.contains(e.relatedTarget))pane.querySelectorAll('.drag').forEach(x=>x.classList.remove('drag'));});
@@ -2259,7 +2360,7 @@ label[for="art"]{font-weight:500!important;font-size:.75rem!important;letter-spa
     else{const d=localStorage.getItem('ar-draft');if(d&&d.trim()){input.value=d;$('restored').hidden=false;}}}catch(e){}}
   else openPlan(hashCode,true);
   $('useExample').onclick=()=>{$('example').click();};
-  input.addEventListener('input',()=>{$('restored').hidden=true;$('sharedNote').hidden=true;});
+  input.addEventListener('input',()=>{$('restored').hidden=true;$('sharedNote').hidden=true;if(!$('paneArt').hidden&&location.protocol!=='file:')updateCreativeGate();});
   render();
 })();
 </script>
